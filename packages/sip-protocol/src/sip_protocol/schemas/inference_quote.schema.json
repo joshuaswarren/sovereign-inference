@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sovereign-inference.org/schemas/inference_quote.schema.json",
+  "title": "SIP-AI Signed Inference Quote",
+  "description": "A provider's signed price commitment for serving one request. The signature covers the canonical quote with the `signature` field removed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "quote_version",
+    "request_id",
+    "provider_pubkey",
+    "model_alias",
+    "price_units",
+    "input_per_1m",
+    "output_per_1m",
+    "max_output_tokens",
+    "max_price",
+    "issued_at",
+    "expires_at",
+    "signature"
+  ],
+  "properties": {
+    "quote_version": { "type": "string", "const": "sip-ai.quote.v1" },
+    "request_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "provider_pubkey": { "type": "string", "pattern": "^ed25519:[A-Za-z0-9+/=_-]{43,46}$" },
+    "model_alias": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "price_units": { "type": "string", "enum": ["pic", "usdc", "x402", "test"] },
+    "input_per_1m": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "Price per 1M input tokens, decimal string."
+    },
+    "output_per_1m": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "Price per 1M output tokens, decimal string."
+    },
+    "max_output_tokens": { "type": "integer", "minimum": 1 },
+    "max_price": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "The provider's committed maximum total charge for this request, decimal string."
+    },
+    "privacy_mode": {
+      "type": "string",
+      "enum": ["local-only", "direct", "relay", "private-payment", "private-payment-relay", "confidential", "batch"]
+    },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "signature": { "type": "string", "pattern": "^ed25519:[A-Za-z0-9+/=_-]{86,88}$" }
+  }
+}

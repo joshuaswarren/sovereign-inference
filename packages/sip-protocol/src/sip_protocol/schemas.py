@@ -20,6 +20,7 @@ from .errors import SchemaValidationError
 
 SCHEMA_FILES: dict[str, str] = {
     "receipt": "inference_receipt.schema.json",
+    "quote": "inference_quote.schema.json",
     "model_manifest": "model_manifest.schema.json",
     "provider_manifest": "provider_manifest.schema.json",
 }
