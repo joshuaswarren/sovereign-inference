@@ -1,0 +1,16 @@
+[project]
+name = "sip-runtime-llamacpp"
+version = "0.1.2"
+description = "llama.cpp runtime adapter for SIP-AI providers."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [{ name = "Joshua Warren" }]
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sip_runtime_llamacpp"]

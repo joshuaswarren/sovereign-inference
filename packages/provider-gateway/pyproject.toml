@@ -1,0 +1,16 @@
+[project]
+name = "sip-provider-gateway"
+version = "0.1.2"
+description = "Hardened provider gateway: auth, quotas, policy, payment validation, and receipt generation in front of a model runtime."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "AGPL-3.0-or-later"
+authors = [{ name = "Joshua Warren" }]
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sip_gateway"]

@@ -1,0 +1,13 @@
+{
+  "name": "@sovereign-inference/dashboard",
+  "version": "0.1.2",
+  "private": true,
+  "description": "Local web dashboard for the Sovereign Inference Node (scaffolded — Phase 1).",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "dev": "echo \"dashboard scaffolded — see ROADMAP.md (Phase 1)\"",
+    "typecheck": "echo \"(no types yet)\"",
+    "build": "echo \"dashboard scaffolded — see ROADMAP.md (Phase 1)\""
+  }
+}

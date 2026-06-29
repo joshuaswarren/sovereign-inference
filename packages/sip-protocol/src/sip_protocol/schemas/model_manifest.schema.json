@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sovereign-inference.org/schemas/model_manifest.schema.json",
+  "title": "SIP-AI Model Manifest",
+  "description": "Public, portable metadata describing an open-weight model artifact: identity, hash, format, quantization, license, runtime support, and recommended settings.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "model_id",
+    "display_name",
+    "source_repo",
+    "weights_hash",
+    "format",
+    "license",
+    "recommended_runtimes",
+    "min_memory_gb"
+  ],
+  "properties": {
+    "schema": { "type": "string", "const": "sip-ai.model_manifest.v1" },
+    "model_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{1,127}$",
+      "description": "Stable lowercase model identifier/alias."
+    },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "source_repo": {
+      "type": "string",
+      "description": "Provenance pointer, e.g. 'huggingface:org/repo'."
+    },
+    "weights_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "SHA-256 of the weights artifact (or a manifest-of-shards hash for multi-file models)."
+    },
+    "format": {
+      "type": "string",
+      "enum": ["GGUF", "safetensors", "pytorch", "onnx", "mlx", "other"]
+    },
+    "quantization": {
+      "type": "string",
+      "description": "Quantization scheme, e.g. 'Q4_K_M', 'fp16', 'awq', 'gptq'."
+    },
+    "license": {
+      "type": "string",
+      "description": "SPDX identifier or model-license id, e.g. 'apache-2.0', 'llama3', 'qwen'."
+    },
+    "commercial_use": {
+      "type": "boolean",
+      "description": "Whether the license permits commercial use (advisory; providers must verify)."
+    },
+    "recommended_runtimes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "min_memory_gb": { "type": "number", "exclusiveMinimum": 0 },
+    "recommended_memory_gb": { "type": "number", "exclusiveMinimum": 0 },
+    "context_tested": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 1 },
+      "description": "Context lengths that have been verified to run."
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["coding", "general-chat", "rag", "embeddings", "vision", "long-context", "reasoning"]
+      }
+    },
+    "manifest_uri": {
+      "type": "string",
+      "description": "Durable storage URI, e.g. 'arweave://<tx-id>'."
+    },
+    "maintainer_signature": {
+      "type": "string",
+      "description": "Optional Ed25519 signature from the model maintainer over the canonical manifest."
+    }
+  }
+}

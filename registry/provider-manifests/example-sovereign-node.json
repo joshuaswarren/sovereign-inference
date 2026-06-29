@@ -1,0 +1,31 @@
+{
+  "benchmark": {
+    "tokens_per_second": 39.4,
+    "ttft_ms": 520
+  },
+  "logging_policy": "no_prompt_logging",
+  "max_concurrency": 2,
+  "max_context": 8192,
+  "models": [
+    "qwen-coder-7b-instruct-gguf-q4_k_m"
+  ],
+  "node_type": "sovereign-node",
+  "pricing": {
+    "input_per_1m": 0.2,
+    "output_per_1m": 0.8,
+    "unit": "pic"
+  },
+  "privacy_modes": [
+    "direct",
+    "relay",
+    "private-payment"
+  ],
+  "provider_pubkey": "ed25519:zKSOwbvn1AyfeDRzrVy2SuatEgZrOvCYXTlqeRk2IAg",
+  "published_at": "2026-06-29T18:00:00Z",
+  "retention_policy": "metrics_only_30d",
+  "runtime_adapters": [
+    "llama.cpp"
+  ],
+  "schema": "sip-ai.provider_manifest.v1",
+  "signature": "ed25519:LoNW99dq55PT-85JjtF5p2jq35SXDBXK4LOFcpP4Ao4oP6nLnohEveBCV42Z399Dt5wNxp0RnsGp8EG9cFH9Bg"
+}

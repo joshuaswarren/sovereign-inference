@@ -1,0 +1,33 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+    validations:
+      required: true
+  - type: input
+    id: component
+    attributes:
+      label: Component
+      description: e.g. sip-protocol, sip-receipt, router, provider-gateway, sin-node, docs
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Commands, inputs, and (if possible) a minimal receipt/manifest.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Python/Node version, uv/pnpm version, package version or commit.
+    validations:
+      required: false

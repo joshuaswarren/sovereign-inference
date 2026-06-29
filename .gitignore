@@ -1,0 +1,82 @@
+# ---- Sovereign Inference monorepo .gitignore ----
+
+# Session / tooling artifacts (not part of the project)
+.mcp_data/
+logs/
+scratchpad/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+env/
+ENV/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+
+# uv
+uv.lock.bak
+
+# ---- Node / TypeScript ----
+node_modules/
+.pnpm-store/
+dist/
+.turbo/
+*.tsbuildinfo
+.next/
+.vite/
+coverage/
+.eslintcache
+
+# ---- Models & large artifacts (never commit weights) ----
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.onnx
+models/
+.cache/
+
+# ---- Secrets & local config ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+*.local
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+!.vscode/extensions.json

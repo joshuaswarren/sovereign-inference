@@ -1,0 +1,16 @@
+[project]
+name = "sip-router"
+version = "0.1.2"
+description = "SIP-AI client SDK and provider router: resolve, score, quote, route, fail over, and verify receipts."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "AGPL-3.0-or-later"
+authors = [{ name = "Joshua Warren" }]
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sip_router"]

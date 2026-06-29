@@ -1,0 +1,17 @@
+{
+  "schema": "sip-ai.model_manifest.v1",
+  "model_id": "qwen-coder-7b-instruct-gguf-q4_k_m",
+  "display_name": "Qwen Coder 7B Instruct GGUF Q4_K_M",
+  "source_repo": "huggingface:Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+  "weights_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "format": "GGUF",
+  "quantization": "Q4_K_M",
+  "license": "apache-2.0",
+  "commercial_use": true,
+  "recommended_runtimes": ["llama.cpp", "ollama"],
+  "min_memory_gb": 8,
+  "recommended_memory_gb": 16,
+  "context_tested": [4096, 8192],
+  "tasks": ["coding", "general-chat"],
+  "manifest_uri": "arweave://PLACEHOLDER_TX_ID"
+}

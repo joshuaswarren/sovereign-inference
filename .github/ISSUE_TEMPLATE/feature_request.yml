@@ -1,0 +1,27 @@
+name: Feature request
+description: Propose a capability or change
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What user job or pain does this address? Link a persona or principle if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: dropdown
+    id: principle
+    attributes:
+      label: Does this respect the product principles?
+      description: See docs/product-principles.md
+      options:
+        - "Yes — aligns with local-first / provider-neutral / safe-by-default / honest-privacy"
+        - "Needs discussion — may tension with a principle"
+    validations:
+      required: true

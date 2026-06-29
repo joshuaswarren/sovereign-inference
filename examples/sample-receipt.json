@@ -1,0 +1,18 @@
+{
+  "receipt_version": "sip-ai.receipt.v1",
+  "request_id": "sample-request-0001",
+  "provider_pubkey": "ed25519:bb6vnb7tGPHYOO4IPy9TuRQHiqlmQ5rY5RrbrVuV318",
+  "model_manifest_hash": "sha256:bb883ab77c5fc38e1f66b520e04244e04b9727e73022d78434a92bbf0aec60ee",
+  "model_alias": "qwen-coder-7b-instruct-gguf-q4_k_m",
+  "runtime": "llama.cpp",
+  "input_tokens": 817,
+  "output_tokens": 242,
+  "price_units": "pic",
+  "price_amount": "0.0042",
+  "privacy_mode": "direct",
+  "started_at": "2026-06-29T18:15:02Z",
+  "completed_at": "2026-06-29T18:15:02Z",
+  "response_hash": "sha256:a33522dee9a3a6b7bbbf9d1ba55f3500e5dcc9d57bbc8564d693bf7bc6aa11e5",
+  "runtime_version": "b3000",
+  "signature": "ed25519:DQKyUvk7y2z5LgyFjMkSrXocTVLtszlDpOtQL5-r0rcfs7KgP9MpTdeA9pPydZL3C_lYjVl5hoxfKveemytoDw"
+}

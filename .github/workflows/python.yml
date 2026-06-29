@@ -1,0 +1,53 @@
+name: python
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: Sync workspace
+        run: uv sync --all-extras --dev
+
+      - name: Ruff format check
+        run: uv run ruff format --check packages adapters
+
+      - name: Ruff lint
+        run: uv run ruff check packages adapters
+
+      - name: mypy (core libraries)
+        run: uv run mypy packages/sip-protocol/src packages/receipt-verifier/src
+
+      - name: Tests
+        run: uv run pytest --cov --cov-report=term-missing
+
+      - name: Receipt CLI smoke test (sign → verify → tamper)
+        shell: bash
+        run: |
+          uv run sip-receipt demo > receipt.json
+          uv run sip-receipt verify receipt.json
+          python -c "import json;d=json.load(open('receipt.json'));d['output_tokens']=1;json.dump(d,open('receipt.json','w'))"
+          if uv run sip-receipt verify receipt.json; then
+            echo "ERROR: tampered receipt verified — signature check is broken"; exit 1
+          else
+            echo "OK: tampered receipt correctly rejected"
+          fi

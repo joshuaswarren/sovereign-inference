@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sovereign-inference.org/schemas/inference_receipt.schema.json",
+  "title": "SIP-AI Signed Inference Receipt",
+  "description": "An accountability artifact signed by a provider over a completed inference request. The signature covers the canonical form of every field except `signature` itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_version",
+    "request_id",
+    "provider_pubkey",
+    "model_manifest_hash",
+    "model_alias",
+    "runtime",
+    "input_tokens",
+    "output_tokens",
+    "price_units",
+    "price_amount",
+    "privacy_mode",
+    "started_at",
+    "completed_at",
+    "response_hash",
+    "signature"
+  ],
+  "properties": {
+    "receipt_version": {
+      "type": "string",
+      "const": "sip-ai.receipt.v1",
+      "description": "Schema/version identifier for this receipt format."
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "Opaque, client-generated request identifier. MUST NOT encode user identity."
+    },
+    "provider_pubkey": {
+      "type": "string",
+      "pattern": "^ed25519:[A-Za-z0-9+/=_-]{43,46}$",
+      "description": "Provider Ed25519 public key, base64url-encoded, prefixed with 'ed25519:'."
+    },
+    "model_manifest_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "SHA-256 hash of the canonical model manifest the provider claims to have served."
+    },
+    "model_alias": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "Human-readable model alias, e.g. 'qwen-coder-7b-instruct-gguf-q4_k_m'."
+    },
+    "runtime": {
+      "type": "string",
+      "enum": ["llama.cpp", "ollama", "vllm", "sglang", "localai", "lmstudio", "ramalama"],
+      "description": "Runtime engine the provider claims to have used."
+    },
+    "runtime_version": {
+      "type": "string",
+      "maxLength": 128,
+      "description": "Version string of the runtime engine (optional but recommended)."
+    },
+    "input_tokens": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of prompt/input tokens billed."
+    },
+    "output_tokens": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of generated/output tokens billed."
+    },
+    "price_units": {
+      "type": "string",
+      "enum": ["pic", "usdc", "x402", "test"],
+      "description": "Settlement unit. 'pic' = Private Inference Credits; 'test' = non-settling test units."
+    },
+    "price_amount": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "Amount charged, encoded as a decimal STRING to avoid float non-determinism in the signed payload."
+    },
+    "privacy_mode": {
+      "type": "string",
+      "enum": [
+        "local-only",
+        "direct",
+        "relay",
+        "private-payment",
+        "private-payment-relay",
+        "confidential",
+        "batch"
+      ],
+      "description": "Privacy/transport mode used for this request."
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC 3339 timestamp when the provider accepted the request."
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC 3339 timestamp when the provider finished the response."
+    },
+    "response_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "SHA-256 hash of the canonical response body. Lets a client prove the response was not altered post-signing."
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^ed25519:[A-Za-z0-9+/=_-]{86,88}$",
+      "description": "Ed25519 signature (base64url) over the canonical receipt with the 'signature' field removed."
+    }
+  }
+}

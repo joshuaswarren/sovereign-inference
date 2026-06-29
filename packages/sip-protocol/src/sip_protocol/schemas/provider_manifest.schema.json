@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sovereign-inference.org/schemas/provider_manifest.schema.json",
+  "title": "SIP-AI Provider Manifest",
+  "description": "Signed metadata advertised by a Sovereign Inference Node (or other provider): supported models, pricing, runtime, benchmark, policy, privacy modes, and public key.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "provider_pubkey",
+    "node_type",
+    "models",
+    "runtime_adapters",
+    "pricing",
+    "max_context",
+    "logging_policy",
+    "privacy_modes",
+    "published_at",
+    "signature"
+  ],
+  "properties": {
+    "schema": { "type": "string", "const": "sip-ai.provider_manifest.v1" },
+    "provider_pubkey": {
+      "type": "string",
+      "pattern": "^ed25519:[A-Za-z0-9+/=_-]{43,46}$"
+    },
+    "node_type": {
+      "type": "string",
+      "enum": ["sovereign-node", "vllm-server", "external-adapter", "relay"]
+    },
+    "models": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "Model ids/aliases this provider can serve."
+    },
+    "runtime_adapters": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "pricing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit"],
+      "properties": {
+        "unit": { "type": "string", "enum": ["pic", "usdc", "x402", "test"] },
+        "input_per_1m": { "type": "number", "minimum": 0 },
+        "output_per_1m": { "type": "number", "minimum": 0 }
+      }
+    },
+    "max_context": { "type": "integer", "minimum": 1 },
+    "max_concurrency": { "type": "integer", "minimum": 1 },
+    "logging_policy": {
+      "type": "string",
+      "enum": ["no_prompt_logging", "metadata_only", "full_logging"]
+    },
+    "retention_policy": {
+      "type": "string",
+      "description": "Free-form retention statement, e.g. 'metrics_only_30d'."
+    },
+    "privacy_modes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["direct", "relay", "private-payment", "private-payment-relay", "confidential", "batch"]
+      },
+      "minItems": 1
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "tokens_per_second": { "type": "number", "minimum": 0 },
+        "ttft_ms": { "type": "number", "minimum": 0 }
+      }
+    },
+    "tee_attestation": {
+      "type": "string",
+      "description": "Optional reference to a TEE attestation document (e.g. Intel TDX quote)."
+    },
+    "manifest_uri": { "type": "string" },
+    "published_at": { "type": "string", "format": "date-time" },
+    "signature": {
+      "type": "string",
+      "pattern": "^ed25519:[A-Za-z0-9+/=_-]{86,88}$"
+    }
+  }
+}
