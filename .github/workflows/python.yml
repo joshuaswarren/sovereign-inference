@@ -29,13 +29,13 @@ jobs:
         run: uv sync --all-extras --dev
 
       - name: Ruff format check
-        run: uv run ruff format --check packages adapters
+        run: uv run ruff format --check packages adapters apps
 
       - name: Ruff lint
-        run: uv run ruff check packages adapters
+        run: uv run ruff check packages adapters apps
 
       - name: mypy (typed libraries)
-        run: uv run mypy packages/sip-protocol/src packages/receipt-verifier/src packages/sin-node/src packages/sin-cli/src adapters/runtime-ollama/src adapters/runtime-llamacpp/src
+        run: uv run mypy packages/sip-protocol/src packages/receipt-verifier/src packages/sin-node/src packages/sin-cli/src packages/compute/src packages/arweave-anchor/src adapters/runtime-ollama/src adapters/runtime-llamacpp/src adapters/provider-nosana/src adapters/provider-akash/src apps/router-demo/src
 
       - name: Tests
         run: uv run pytest --cov --cov-report=term-missing
@@ -57,3 +57,6 @@ jobs:
         run: |
           uv run sin scan --json | python -c "import json,sys; d=json.load(sys.stdin); assert 'accelerator' in d; print('scan ok:', d['accelerator'])"
           uv run sin recommend --task coding --top 3 --json | python -c "import json,sys; r=json.load(sys.stdin); assert len(r) >= 1; print('recommend ok:', len(r), 'results')"
+
+      - name: Decentralized demo smoke test (provision → anchor → route → verify)
+        run: uv run sip-decentralized-demo

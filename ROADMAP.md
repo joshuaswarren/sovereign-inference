@@ -31,10 +31,16 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ PIC: issue → redeem → settle, with atomic double-spend prevention (and signed voucher artifact)
 - ✅ Provider accounting & balances (Ledger); HTTP 402 challenge wired into gateway + router (charge-on-success)
 
-## Phase 4 — Decentralized integration  (Weeks 5–6)
-- ⬜ Arweave manifest anchoring (model + provider manifests, public receipts)
-- ⬜ One external compute/provider adapter (Nosana first — aligns with the $35k credits)
-- ⬜ Published, reproducible demo metrics
+## Phase 4 — Decentralized integration  (Weeks 5–6) — ✅ complete
+- ✅ Arweave manifest & receipt anchoring (`sip-arweave`: `LocalAnchor` offline +
+  `ArweaveAnchor` `ar://`, verify-before-anchor, canonical round-trip)
+- ✅ Shared external-compute contract (`sip-compute`: `InferenceSpec`/`Deployment`,
+  `ComputeProvider` protocol + registry, signed `external-adapter` provider manifest)
+- ✅ **Two** external compute/provider adapters — **Nosana** (GPU job network) and
+  **Akash** (SDL marketplace: create → bid → lease → manifest → ingress) — with
+  injected CLI boundaries so the full lifecycle is unit-tested offline
+- ✅ Published, reproducible demo metrics (`sip-decentralized-demo`: provision →
+  advertise → anchor → route → verify, all in-process and deterministic)
 
 > **Hackathon Round 1 target = Phases 0–4** plus the HackerNoon
 > [article series](docs/hackathon/article-series.md) and the

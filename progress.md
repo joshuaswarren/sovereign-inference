@@ -3,6 +3,29 @@
 A running log of what's done and what's next. See [ROADMAP.md](ROADMAP.md) for
 the phased plan and [CHANGELOG.md](CHANGELOG.md) for released changes.
 
+## 2026-06-29 — Phase 4: decentralized integration (external compute + anchoring)
+
+**Done** (branch `feat/phase-4-decentralized`, PR pending)
+- **`sip-compute`** (lead, TDD): external-compute contract — `InferenceSpec` /
+  `Deployment` / `DeploymentStatus`, `ComputeProvider` protocol + registry, and
+  `provider_manifest_for` (signed `external-adapter` provider manifest).
+- **`sip-arweave`** (lead, TDD): `LocalAnchor` (offline `local://`) + `ArweaveAnchor`
+  (`ar://`, HTTP resolve + injected tx submitter); canonical round-trip and
+  **verify-before-anchor** for receipts/manifests.
+- **`sip-provider-nosana`** and **`sip-provider-akash`** adapters: real job/SDL
+  builders + full provision→poll→teardown lifecycle, reached through injected CLI
+  boundaries so they unit-test offline (live deploy needs the real CLIs + wallet).
+- **Decentralized demo** (`sip-decentralized-demo`): provision → advertise → anchor
+  → route → verify → anchor receipt, fully in-process & deterministic, with
+  reproducible metrics. Wired into CI (lint/type/test now cover `apps` + the four
+  new packages; a demo smoke-test step added).
+- Full suite + ruff + mypy --strict clean. Adversarial-review workflow run; fixes
+  applied per confirmed findings.
+
+**Next**
+- 3-machine live validation (laptop / macstudio / proxmox2); open PR for issue #10.
+- Phase 5 (privacy modes) per the roadmap.
+
 ## 2026-06-29 — Phase 3: payments (PIC + x402)
 
 **Done** (branch `feat/phase-3-payment`, PR pending)

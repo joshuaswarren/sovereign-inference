@@ -1,0 +1,20 @@
+[project]
+name = "sip-provider-akash"
+version = "0.1.2"
+description = "Akash external-compute provider adapter: provision an inference deployment on the Akash marketplace and expose it as a SIP-AI provider."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [{ name = "Joshua Warren" }]
+dependencies = ["sip-compute", "sip-protocol", "pyyaml>=6.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sip_provider_akash"]
+
+[tool.uv.sources]
+sip-compute = { workspace = true }
+sip-protocol = { workspace = true }

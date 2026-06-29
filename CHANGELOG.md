@@ -80,5 +80,27 @@ follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
     debited / provider ledger credited → double-spend replay rejected.
   - Adversarial review pass: 4 confirmed money bugs fixed with regression tests
     (x402 replay, charge-on-success, receipt==charged, paid-retry voucher safety).
+- **Phase 4 — decentralized integration (external compute + permanent provenance):**
+  - **`sip-compute`**: a provider-agnostic external-compute contract — the
+    `InferenceSpec`/`Deployment`/`DeploymentStatus` types, the `ComputeProvider`
+    protocol + a factory registry, and `provider_manifest_for`, which turns a
+    provisioned endpoint into a signed `external-adapter` SIP provider manifest.
+  - **`sip-arweave`**: anchor SIP-AI provenance to durable storage and resolve it
+    back — `LocalAnchor` (offline, content-addressed `local://`) and `ArweaveAnchor`
+    (permanent `ar://`, HTTP resolve + injected transaction submitter), with
+    canonical-JSON round-tripping and **verify-before-anchor** for receipts/manifests.
+  - **`sip-provider-nosana`**: a Nosana adapter that builds a container job
+    definition, posts it, polls to `RUNNING`, exposes the served endpoint, and
+    registers as a SIP `nosana` compute provider.
+  - **`sip-provider-akash`**: an Akash adapter that builds an SDL v2.0 manifest and
+    drives the real marketplace lifecycle (create → cheapest-bid → lease →
+    send-manifest → poll lease ingress) as the SIP `akash` compute provider.
+  - Both adapters reach their networks only through **injected boundaries** (a CLI
+    runner + an injected `sleep`), so the entire provision/poll/teardown lifecycle
+    is unit-tested offline; a live deploy needs the real CLIs and a funded wallet.
+  - **Decentralized demo** (`sip-decentralized-demo`): provision a node via the
+    Nosana adapter → advertise it as a signed provider → anchor the manifest →
+    route a real request → verify and anchor the signed receipt — fully in-process,
+    deterministic, with reproducible metrics.
 
 [Unreleased]: https://github.com/joshuaswarren/sovereign-inference/commits/main
