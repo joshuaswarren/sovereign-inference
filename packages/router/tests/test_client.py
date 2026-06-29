@@ -115,7 +115,9 @@ class FakeGateway:
         completion_status: int = 200,
         raise_transport_error: bool = False,
         receipt_override: dict[str, Any] | None = None,
+        quote_override: dict[str, Any] | None = None,
         omit_receipt: bool = False,
+        completion_non_json: bool = False,
         models: list[str] | None = None,
     ) -> None:
         self.kp = kp
@@ -124,7 +126,9 @@ class FakeGateway:
         self.completion_status = completion_status
         self.raise_transport_error = raise_transport_error
         self.receipt_override = receipt_override
+        self.quote_override = quote_override
         self.omit_receipt = omit_receipt
+        self.completion_non_json = completion_non_json
         self.models = models if models is not None else [MODEL]
         self.completion_calls = 0
         self.manifest = _manifest(kp, models=self.models)
@@ -142,11 +146,13 @@ class FakeGateway:
                 },
             )
         if path == "/sip/v1/quote":
-            return httpx.Response(200, json=_signed_quote(self.kp))
+            return httpx.Response(200, json=self.quote_override or _signed_quote(self.kp))
         if path == "/v1/chat/completions":
             self.completion_calls += 1
             if self.raise_transport_error:
                 raise httpx.ConnectError("boom", request=request)
+            if self.completion_non_json:
+                return httpx.Response(200, text="<html>not json</html>")
             if self.completion_status != 200:
                 return httpx.Response(self.completion_status, json={"error": "nope"})
             body = _completion_body(self.kp, content=self.content)
@@ -384,3 +390,115 @@ def test_max_providers_limits_attempts() -> None:
         client.chat(MODEL, MESSAGES, max_providers=1)
 
     assert len(excinfo.value.attempts) == 1
+
+
+# --- regression: adversarial-review findings --------------------------------
+
+
+def test_failover_on_non_json_200_body() -> None:
+    # A provider returning HTTP 200 with a non-JSON body must fail over, not crash
+    # the route (json.JSONDecodeError is a ValueError, not an httpx.HTTPError).
+    bad_kp = KeyPair.generate()
+    good_kp = KeyPair.generate()
+    bad = FakeGateway(bad_kp, completion_non_json=True)
+    good = FakeGateway(good_kp, content="clean json")
+    registry = _registry(_entry("http://bad", bad), _entry("http://good", good))
+    client = SovereignClient(registry, client_factory=_factory({"http://bad": bad, "http://good": good}))
+
+    result = client.chat(MODEL, MESSAGES)
+    assert result.base_url == "http://good"
+    assert result.content == "clean json"
+    assert result.attempts[0] == {"base_url": "http://bad", "outcome": "malformed_response"}
+
+
+def test_failover_on_receipt_response_hash_mismatch() -> None:
+    # A validly-signed, correctly-keyed receipt whose response_hash is for DIFFERENT
+    # content must be rejected: the receipt must bind to the answer we received.
+    bad_kp = KeyPair.generate()
+    good_kp = KeyPair.generate()
+    mismatched = _signed_receipt(bad_kp, content="a completely different answer")
+    bad = FakeGateway(bad_kp, content="the real answer", receipt_override=mismatched)
+    good = FakeGateway(good_kp, content="trustworthy")
+    registry = _registry(_entry("http://bad", bad), _entry("http://good", good))
+    client = SovereignClient(registry, client_factory=_factory({"http://bad": bad, "http://good": good}))
+
+    result = client.chat(MODEL, MESSAGES, verify_receipts=True)
+    assert result.base_url == "http://good"
+    assert result.content == "trustworthy"
+    assert result.attempts[0]["outcome"] == "receipt_unverified"
+
+
+def _priced_quote(kp: KeyPair, *, max_price: str) -> dict[str, Any]:
+    now = datetime.now(UTC)
+    return sign_quote(
+        build_quote(
+            request_id="req-1",
+            provider_pubkey=kp.public_key_str,
+            model_alias=MODEL,
+            price_units="test",
+            input_per_1m="0",
+            output_per_1m="0",
+            max_output_tokens=256,
+            max_price=max_price,
+            issued_at=now,
+            expires_at=now + timedelta(minutes=5),
+        ),
+        kp,
+    )
+
+
+def _priced_receipt(kp: KeyPair, *, content: str, price_amount: str) -> dict[str, Any]:
+    now = datetime.now(UTC)
+    return sign_receipt(
+        build_receipt(
+            request_id="req-1",
+            provider_pubkey=kp.public_key_str,
+            model_manifest_hash=MODEL_HASH,
+            model_alias=MODEL,
+            runtime="llama.cpp",
+            input_tokens=5,
+            output_tokens=len(content.split()),
+            price_units="test",
+            price_amount=price_amount,
+            privacy_mode="direct",
+            started_at=now,
+            completed_at=now,
+            response_hash=hash_response_body(content),
+        ),
+        kp,
+    )
+
+
+def test_failover_when_receipt_price_exceeds_quote_max() -> None:
+    # Provider quotes cheap (max_price 0.001) but the receipt charges 1.0 -> reject.
+    bad_kp = KeyPair.generate()
+    good_kp = KeyPair.generate()
+    content = "overpriced answer"
+    bad = FakeGateway(
+        bad_kp,
+        content=content,
+        quote_override=_priced_quote(bad_kp, max_price="0.001"),
+        receipt_override=_priced_receipt(bad_kp, content=content, price_amount="1.0"),
+    )
+    good = FakeGateway(good_kp, content="fair price")
+    registry = _registry(_entry("http://bad", bad), _entry("http://good", good))
+    client = SovereignClient(registry, token="t", client_factory=_factory({"http://bad": bad, "http://good": good}))
+
+    result = client.chat(MODEL, MESSAGES, get_quote=True)
+    assert result.base_url == "http://good"
+    assert result.attempts[0] == {"base_url": "http://bad", "outcome": "quote_violated"}
+
+
+def test_failover_when_quote_signed_by_impostor() -> None:
+    # The quote must be bound to the candidate provider, like the receipt is.
+    bad_kp = KeyPair.generate()
+    impostor = KeyPair.generate()
+    good_kp = KeyPair.generate()
+    bad = FakeGateway(bad_kp, content="legit body", quote_override=_priced_quote(impostor, max_price="0"))
+    good = FakeGateway(good_kp, content="bound quote")
+    registry = _registry(_entry("http://bad", bad), _entry("http://good", good))
+    client = SovereignClient(registry, token="t", client_factory=_factory({"http://bad": bad, "http://good": good}))
+
+    result = client.chat(MODEL, MESSAGES, get_quote=True)
+    assert result.base_url == "http://good"
+    assert result.attempts[0]["outcome"] == "quote_violated"

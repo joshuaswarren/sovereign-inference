@@ -12,12 +12,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any
 from uuid import uuid4
 
 import httpx
 
-from sip_protocol import verify_quote, verify_receipt
+from sip_protocol import hash_response_body, quote_is_expired, verify_quote, verify_receipt
 
 from .errors import NoProviderAvailable
 from .models import ProviderEntry, RouteResult
@@ -170,14 +171,17 @@ class SovereignClient:
         if response.status_code != 200:
             return _Attempt(label=f"http_{response.status_code}")
 
-        body = response.json()
+        body = _safe_json(response)
         content = _extract_content(body)
         if content is None:
             return _Attempt(label="malformed_response")
 
-        receipt = body.get("sip_receipt")
-        if verify_receipts and not self._receipt_trusted(receipt, candidate):
+        receipt = body.get("sip_receipt") if isinstance(body, dict) else None
+        if verify_receipts and not self._receipt_trusted(receipt, candidate, content):
             return _Attempt(label="receipt_unverified")
+
+        if quote is not None and not self._quote_honored(quote, receipt, candidate):
+            return _Attempt(label="quote_violated")
 
         return _Attempt(result=_Served(content=content, receipt=receipt or {}, quote=quote))
 
@@ -185,8 +189,8 @@ class SovereignClient:
         response = client.get("/sip/v1/health")
         if response.status_code != 200:
             return False
-        body = response.json()
-        return bool(body.get("status") == "ok")
+        body = _safe_json(response)
+        return isinstance(body, dict) and body.get("status") == "ok"
 
     def _fetch_quote(
         self,
@@ -212,7 +216,7 @@ class SovereignClient:
         )
         if response.status_code != 200:
             return None
-        quote: dict[str, Any] = response.json()
+        quote = _safe_json(response)
         if not isinstance(quote, dict) or not verify_quote(quote).valid:
             return None
         return quote
@@ -227,13 +231,32 @@ class SovereignClient:
         return headers
 
     @staticmethod
-    def _receipt_trusted(receipt: Any, candidate: ProviderEntry) -> bool:
+    def _receipt_trusted(receipt: Any, candidate: ProviderEntry, content: str) -> bool:
         if not isinstance(receipt, dict):
             return False
         if not verify_receipt(receipt).valid:
             return False
-        expected = candidate.manifest.get("provider_pubkey")
-        return receipt.get("provider_pubkey") == expected
+        if receipt.get("provider_pubkey") != candidate.manifest.get("provider_pubkey"):
+            return False
+        # Bind the receipt to the response body we actually received: a valid,
+        # correctly-keyed receipt over some *other* answer must not be trusted.
+        return receipt.get("response_hash") == hash_response_body(content)
+
+    def _quote_honored(self, quote: dict[str, Any], receipt: Any, candidate: ProviderEntry) -> bool:
+        """A provider must honor the quote it signed: same provider, not expired,
+        and the receipt price must not exceed the committed ``max_price``."""
+        if quote.get("provider_pubkey") != candidate.manifest.get("provider_pubkey"):
+            return False
+        if quote_is_expired(quote, self._now()):
+            return False
+        if not isinstance(receipt, dict) or receipt.get("price_units") != quote.get("price_units"):
+            return False
+        try:
+            charged = Decimal(str(receipt.get("price_amount")))
+            committed = Decimal(str(quote.get("max_price")))
+        except (InvalidOperation, TypeError):
+            return False
+        return charged <= committed
 
 
 class _Served:
@@ -255,6 +278,19 @@ class _Attempt:
     def __init__(self, *, label: str = "ok", result: _Served | None = None) -> None:
         self.result = result
         self.label = "ok" if result is not None else label
+
+
+def _safe_json(response: httpx.Response) -> Any:
+    """Parse a response body as JSON, returning None on a malformed body.
+
+    A provider that returns HTTP 200 with a non-JSON body must be skipped so the
+    router fails over — ``response.json()`` raises ``json.JSONDecodeError`` (a
+    ``ValueError``), which the transport-error failover catch would otherwise miss.
+    """
+    try:
+        return response.json()
+    except ValueError:
+        return None
 
 
 def _extract_content(body: Any) -> str | None:

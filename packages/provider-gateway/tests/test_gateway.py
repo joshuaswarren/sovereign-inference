@@ -15,6 +15,8 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
+
+from sip_gateway import MockAdapter, create_app
 from sip_protocol import (
     KeyPair,
     hash_response_body,
@@ -22,8 +24,6 @@ from sip_protocol import (
     verify_quote,
     verify_receipt,
 )
-
-from sip_gateway import MockAdapter, create_app
 
 ALLOWED = ["echo-model", "echo-model-2"]
 
@@ -297,3 +297,28 @@ def test_now_is_injectable_for_deterministic_timestamps(keypair: KeyPair) -> Non
     receipt = resp.json()["sip_receipt"]
     assert receipt["started_at"] == "2026-06-29T12:00:00Z"
     assert receipt["completed_at"] == "2026-06-29T12:00:00Z"
+
+
+def test_quote_max_price_is_upper_bound_on_receipt_price(keypair: KeyPair) -> None:
+    # Regression: with non-zero INPUT pricing the quote's max_price must still
+    # bound the eventual receipt price (it previously priced input at 0 tokens).
+    from decimal import Decimal
+
+    client = make_client(keypair, price_units="usdc", input_per_1m="0.50", output_per_1m="0.50")
+    quote = client.post(
+        "/sip/v1/quote",
+        json={"request_id": "r1", "model": "echo-model", "max_output_tokens": 64},
+    ).json()
+    completion = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "echo-model",
+            "messages": [{"role": "user", "content": "hello there friend"}],
+            "max_tokens": 64,
+        },
+    ).json()
+
+    committed = Decimal(quote["max_price"])
+    charged = Decimal(completion["sip_receipt"]["price_amount"])
+    assert committed > 0  # input cost is now actually included in the commitment
+    assert charged <= committed

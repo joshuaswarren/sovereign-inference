@@ -74,25 +74,19 @@ def test_faster_provider_scores_higher() -> None:
         models=["m1"],
         benchmark={"ttft_ms": 2000.0, "tokens_per_second": 5.0},
     )
-    assert score_provider(fast, privacy_mode="direct") > score_provider(
-        slow, privacy_mode="direct"
-    )
+    assert score_provider(fast, privacy_mode="direct") > score_provider(slow, privacy_mode="direct")
 
 
 def test_cheaper_provider_scores_higher() -> None:
     cheap = _entry("http://cheap", models=["m1"], input_per_1m=0.1, output_per_1m=0.1)
     pricey = _entry("http://pricey", models=["m1"], input_per_1m=50.0, output_per_1m=50.0)
-    assert score_provider(cheap, privacy_mode="direct") > score_provider(
-        pricey, privacy_mode="direct"
-    )
+    assert score_provider(cheap, privacy_mode="direct") > score_provider(pricey, privacy_mode="direct")
 
 
 def test_privacy_mode_match_scores_higher_than_mismatch() -> None:
     match = _entry("http://m", models=["m1"], privacy_modes=["direct", "relay"])
     mismatch = _entry("http://x", models=["m1"], privacy_modes=["direct"])
-    assert score_provider(match, privacy_mode="relay") > score_provider(
-        mismatch, privacy_mode="relay"
-    )
+    assert score_provider(match, privacy_mode="relay") > score_provider(mismatch, privacy_mode="relay")
 
 
 def test_measured_latency_overrides_benchmark() -> None:

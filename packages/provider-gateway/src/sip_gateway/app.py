@@ -15,6 +15,7 @@ carries a provider-signed receipt so a client can later audit what it paid for.
 
 from __future__ import annotations
 
+import hmac
 import time
 from collections import deque
 from collections.abc import Callable
@@ -151,11 +152,7 @@ def create_app(
         logging_policy=logging_policy,
         now=now,
     )
-    limiter = (
-        _RateLimiter(rate_limit_per_minute, clock)
-        if rate_limit_per_minute is not None
-        else None
-    )
+    limiter = _RateLimiter(rate_limit_per_minute, clock) if rate_limit_per_minute is not None else None
 
     app = FastAPI(title="SIP-AI Provider Gateway")
 
@@ -164,12 +161,12 @@ def create_app(
             return True
         header = request.headers.get("authorization", "")
         scheme, _, presented = header.partition(" ")
-        return scheme.lower() == "bearer" and presented == token
+        # Constant-time compare so the token can't be recovered via a timing
+        # side-channel (the scheme is not secret, so short-circuiting it is fine).
+        return scheme.lower() == "bearer" and hmac.compare_digest(presented.encode("utf-8"), token.encode("utf-8"))
 
     def _price_amount(input_tokens: int, output_tokens: int) -> str:
-        amount = (input_tokens / 1e6) * float(input_per_1m) + (
-            output_tokens / 1e6
-        ) * float(output_per_1m)
+        amount = (input_tokens / 1e6) * float(input_per_1m) + (output_tokens / 1e6) * float(output_per_1m)
         return _format_amount(amount)
 
     @app.get("/sip/v1/health")
@@ -213,7 +210,11 @@ def create_app(
             return JSONResponse({"error": "unknown model"}, status_code=404)
 
         issued = now()
-        max_price = _price_amount(0, max_out)
+        # max_price must be a TRUE upper bound on the eventual receipt price.
+        # The quote endpoint never sees the prompt, so bound the input by
+        # max_input_chars (tokens <= chars), guaranteeing an honest receipt can
+        # never exceed the committed price.
+        max_price = _price_amount(max_input_chars, max_out)
         unsigned = build_quote(
             request_id=request_id,
             provider_pubkey=keypair.public_key_str,
@@ -256,9 +257,7 @@ def create_app(
 
         # 3. output token cap
         if max_tokens > max_output_tokens:
-            return JSONResponse(
-                {"error": "max_tokens exceeds gateway cap"}, status_code=413
-            )
+            return JSONResponse({"error": "max_tokens exceeds gateway cap"}, status_code=413)
 
         # 4. input size cap
         total_chars = sum(len(m["content"]) for m in messages)
@@ -326,10 +325,7 @@ def _valid_messages(messages: Any) -> TypeGuard[list[dict[str, str]]]:
     if not isinstance(messages, list) or not messages:
         return False
     return all(
-        isinstance(m, dict)
-        and isinstance(m.get("role"), str)
-        and isinstance(m.get("content"), str)
-        for m in messages
+        isinstance(m, dict) and isinstance(m.get("role"), str) and isinstance(m.get("content"), str) for m in messages
     )
 
 
