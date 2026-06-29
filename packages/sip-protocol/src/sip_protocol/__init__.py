@@ -27,6 +27,14 @@ from .manifests import (
     validate_model_manifest,
     verify_provider_manifest,
 )
+from .quotes import (
+    QUOTE_VERSION,
+    QuoteVerification,
+    build_quote,
+    quote_is_expired,
+    sign_quote,
+    verify_quote,
+)
 from .receipts import (
     RECEIPT_VERSION,
     VerificationResult,
@@ -46,14 +54,17 @@ from .signing import (
 __version__ = "0.1.2"
 
 __all__ = [
+    "QUOTE_VERSION",
     "RECEIPT_VERSION",
     "KeyEncodingError",
     "KeyPair",
+    "QuoteVerification",
     "SIPProtocolError",
     "SchemaValidationError",
     "SignatureError",
     "VerificationResult",
     "__version__",
+    "build_quote",
     "build_receipt",
     "canonical_json",
     "decode_public_key",
@@ -62,10 +73,12 @@ __all__ = [
     "iter_errors",
     "load_schema",
     "model_manifest_hash",
+    "quote_is_expired",
     "receipt_signing_bytes",
     "sha256_prefixed",
     "sign_document",
     "sign_provider_manifest",
+    "sign_quote",
     "sign_receipt",
     "signing_bytes",
     "validate",
@@ -73,5 +86,6 @@ __all__ = [
     "verify",
     "verify_document",
     "verify_provider_manifest",
+    "verify_quote",
     "verify_receipt",
 ]

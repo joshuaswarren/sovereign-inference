@@ -3,6 +3,26 @@
 A running log of what's done and what's next. See [ROADMAP.md](ROADMAP.md) for
 the phased plan and [CHANGELOG.md](CHANGELOG.md) for released changes.
 
+## 2026-06-29 — Phase 2: SIP-AI network routing
+
+**Done** (branch `feat/phase-2-network-routing`, PR pending)
+- Signed inference **quotes** (`sip-ai.quote.v1`) in `sip-protocol` (TDD).
+- **Provider gateway** (FastAPI): auth, model allowlist, context/token caps,
+  rate limit, logging policy; `/sip/v1` health/quote/manifest + OpenAI-compatible
+  `/v1/chat/completions` returning a provider-signed receipt.
+- **Router**: registry + resolver + weighted scoring (§6.8) + `SovereignClient`
+  (resolve → score → quote → route → verify receipt → **failover**).
+- **End-to-end demo** routes across two real in-process gateways and fails over
+  on provider failure — `uv run sip-router-demo` passes.
+- Built via an implementation workflow + adversarial-review workflow; 8 confirmed
+  findings fixed (non-JSON-body failover, receipt↔response-hash binding, signed-
+  quote price/identity/expiry enforcement, constant-time auth, true-upper-bound
+  quote pricing) with regression tests. Full suite + ruff + mypy --strict clean.
+
+**Next (Phase 3 — payment)**
+- x402 direct-pay path; Private Inference Credits issue → redeem → settle with
+  double-spend prevention; provider accounting (issues #9).
+
 ## 2026-06-29 — Phase 1: Sovereign Inference Node (local node)
 
 **Done** (branch `feat/phase-1-local-node`, PR pending)

@@ -19,6 +19,7 @@ members = [
     "sip-provider-gateway",
     "sip-receipts",
     "sip-router",
+    "sip-router-demo",
     "sip-runtime-llamacpp",
     "sip-runtime-ollama",
     "sip-runtime-vllm",
@@ -1083,6 +1084,22 @@ requires-dist = [
 name = "sip-provider-gateway"
 version = "0.1.2"
 source = { editable = "packages/provider-gateway" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "sin-node" },
+    { name = "sip-protocol" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.110" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "sin-node", editable = "packages/sin-node" },
+    { name = "sip-protocol", editable = "packages/sip-protocol" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },
+]
 
 [[package]]
 name = "sip-receipts"
@@ -1099,6 +1116,39 @@ requires-dist = [{ name = "sip-protocol", editable = "packages/sip-protocol" }]
 name = "sip-router"
 version = "0.1.2"
 source = { editable = "packages/router" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "sip-protocol" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "pydantic", specifier = ">=2.6" },
+    { name = "sip-protocol", editable = "packages/sip-protocol" },
+]
+
+[[package]]
+name = "sip-router-demo"
+version = "0.1.2"
+source = { editable = "apps/router-demo" }
+dependencies = [
+    { name = "httpx" },
+    { name = "sin-node" },
+    { name = "sip-protocol" },
+    { name = "sip-provider-gateway" },
+    { name = "sip-router" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "sin-node", editable = "packages/sin-node" },
+    { name = "sip-protocol", editable = "packages/sip-protocol" },
+    { name = "sip-provider-gateway", editable = "packages/provider-gateway" },
+    { name = "sip-router", editable = "packages/router" },
+]
 
 [[package]]
 name = "sip-runtime-llamacpp"
