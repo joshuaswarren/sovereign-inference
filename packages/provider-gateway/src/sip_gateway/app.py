@@ -25,6 +25,7 @@ from typing import Any, Protocol, TypeGuard
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+import sip_pic
 from sin_node.models import ChatResult
 from sip_protocol import (
     KeyPair,
@@ -136,11 +137,21 @@ def create_app(
     input_per_1m: str = "0",
     output_per_1m: str = "0",
     provider_manifest: dict[str, Any] | None = None,
+    require_payment: bool = False,
+    pic_issuers: list[str] | None = None,
+    spent_set: sip_pic.SpentSet | None = None,
+    ledger: sip_pic.Ledger | None = None,
+    accept_schemes: list[str] | None = None,
     clock: Callable[[], float] = time.monotonic,
     now: Callable[[], datetime] = _utc_now,
 ) -> FastAPI:
     """Build and return the configured provider-gateway :class:`FastAPI` app."""
     allowed = list(allowed_models)
+    issuers = list(pic_issuers or [])
+    accepted = list(accept_schemes) if accept_schemes is not None else ["pic", "x402"]
+    # A fresh in-memory spent-set per app keeps the double-spend guard local to
+    # the gateway unless the caller wires in a shared (file-backed) one.
+    spend_guard = spent_set if spent_set is not None else sip_pic.SpentSet()
     manifest = provider_manifest or _synthesize_manifest(
         keypair=keypair,
         allowed_models=allowed,
@@ -268,10 +279,44 @@ def create_app(
         if limiter is not None and not limiter.allow():
             return JSONResponse({"error": "rate limited"}, status_code=429)
 
+        # 6. payment enforcement (after rate limit, before serving)
+        if require_payment:
+            billed_input = sum(len(m["content"].split()) for m in messages)
+            required = _price_amount(billed_input, max_tokens)
+            payment = body.get("sip_payment")
+            redemption = sip_pic.redeem_payment(
+                payment if isinstance(payment, dict) else {},
+                price=required,
+                unit=price_units,
+                issuer_pubkeys=issuers,
+                spent_set=spend_guard,
+                now=now(),
+            )
+            if not redemption.ok:
+                return JSONResponse(
+                    {
+                        "error": "payment required",
+                        "sip_payment_required": sip_pic.payment_required(
+                            price=required,
+                            unit=price_units,
+                            issuer_pubkeys=issuers,
+                            accept=accepted,
+                        ),
+                    },
+                    status_code=402,
+                )
+            if ledger is not None:
+                ledger.record(
+                    keypair.public_key_str,
+                    required,
+                    price_units,
+                    refs=_payment_refs(payment if isinstance(payment, dict) else {}),
+                )
+
         privacy_mode = request.headers.get("x-sip-privacy-mode", DEFAULT_PRIVACY_MODE)
         request_id = request.headers.get("x-sip-request-id", "anon")
 
-        # 6. serve
+        # 7. serve
         started = now()
         result = adapter.chat(model, messages, max_tokens=max_tokens)
         completed = now()
@@ -318,6 +363,27 @@ def create_app(
         )
 
     return app
+
+
+def _payment_refs(payment: dict[str, Any]) -> list[str]:
+    """Derive ledger reference strings identifying a redeemed payment.
+
+    For a ``pic`` payment the refs are the redeemed voucher ids; for an
+    ``x402`` payment the single ref is the payer pubkey (the only stable handle
+    on the off-voucher credit). Returns an empty list for anything unexpected.
+    """
+    scheme = payment.get("scheme")
+    if scheme == "pic":
+        vouchers = payment.get("vouchers")
+        if isinstance(vouchers, list):
+            return [v["voucher_id"] for v in vouchers if isinstance(v, dict) and isinstance(v.get("voucher_id"), str)]
+        return []
+    if scheme == "x402":
+        inner = payment.get("payment")
+        if isinstance(inner, dict) and isinstance(inner.get("payer_pubkey"), str):
+            return [inner["payer_pubkey"]]
+        return []
+    return []
 
 
 def _valid_messages(messages: Any) -> TypeGuard[list[dict[str, str]]]:

@@ -9,6 +9,7 @@ authors = [{ name = "Joshua Warren" }]
 dependencies = [
     "sip-router",
     "sip-provider-gateway",
+    "sip-pic",
     "sin-node",
     "sip-protocol",
     "httpx>=0.27",
@@ -27,5 +28,6 @@ packages = ["src/sip_router_demo"]
 [tool.uv.sources]
 sip-router = { workspace = true }
 sip-provider-gateway = { workspace = true }
+sip-pic = { workspace = true }
 sin-node = { workspace = true }
 sip-protocol = { workspace = true }

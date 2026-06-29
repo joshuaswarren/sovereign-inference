@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sovereign-inference.org/schemas/inference_voucher.schema.json",
+  "title": "SIP-AI Private Inference Credit (Voucher)",
+  "description": "An issuer-signed bearer credit. Whoever holds the voucher (with its secret voucher_id) may redeem it. The signature covers the canonical voucher with the `signature` field removed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "voucher_version",
+    "voucher_id",
+    "denomination",
+    "unit",
+    "issuer_pubkey",
+    "issued_at",
+    "expires_at",
+    "signature"
+  ],
+  "properties": {
+    "voucher_version": { "type": "string", "const": "sip-ai.voucher.v1" },
+    "voucher_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{43,86}$",
+      "description": "High-entropy bearer secret (base64url, >=32 bytes). Holding it is ownership; it is also the double-spend key."
+    },
+    "denomination": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "Face value of the credit, as a decimal string."
+    },
+    "unit": { "type": "string", "enum": ["pic", "usdc", "test"] },
+    "issuer_pubkey": { "type": "string", "pattern": "^ed25519:[A-Za-z0-9+/=_-]{43,46}$" },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "signature": { "type": "string", "pattern": "^ed25519:[A-Za-z0-9+/=_-]{86,88}$" }
+  }
+}

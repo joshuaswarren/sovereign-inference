@@ -18,7 +18,8 @@ from uuid import uuid4
 
 import httpx
 
-from sip_protocol import hash_response_body, quote_is_expired, verify_quote, verify_receipt
+import sip_pic
+from sip_protocol import KeyPair, hash_response_body, quote_is_expired, verify_quote, verify_receipt
 
 from .errors import NoProviderAvailable
 from .models import ProviderEntry, RouteResult
@@ -69,12 +70,22 @@ class SovereignClient:
         get_quote: bool = False,
         max_providers: int | None = None,
         weights: dict[str, float] | None = None,
+        wallet: sip_pic.Wallet | None = None,
+        x402_keypair: KeyPair | None = None,
     ) -> RouteResult:
         """Send ``messages`` to the best available provider serving ``model``.
 
         Raises :class:`NoProviderAvailable` if every candidate fails (or none
         serve the model). ``attempts`` on the result/exception records each
         provider tried and why it was skipped.
+
+        When a provider answers a completion with HTTP 402 (payment required),
+        the client pays the exact quoted price and retries that same provider
+        once: with ``wallet`` it spends held PIC vouchers, or with
+        ``x402_keypair`` it signs an x402 payment. A provider that cannot be
+        paid (no matching scheme, insufficient funds, or a rejected paid retry)
+        fails over to the next candidate, and any PIC vouchers reserved for a
+        rejected batch are returned to the wallet.
         """
         candidates = resolve(self._registry, model, privacy_mode=privacy_mode, weights=weights)
         if max_providers is not None:
@@ -93,6 +104,8 @@ class SovereignClient:
                 verify_receipts=verify_receipts,
                 get_quote=get_quote,
                 request_id=request_id,
+                wallet=wallet,
+                x402_keypair=x402_keypair,
             )
             attempts.append({"base_url": candidate.base_url, "outcome": outcome.label})
             if outcome.result is not None:
@@ -118,6 +131,8 @@ class SovereignClient:
         verify_receipts: bool,
         get_quote: bool,
         request_id: str,
+        wallet: sip_pic.Wallet | None,
+        x402_keypair: KeyPair | None,
     ) -> _Attempt:
         client = self._client_factory(candidate.base_url)
         try:
@@ -131,6 +146,8 @@ class SovereignClient:
                 verify_receipts=verify_receipts,
                 get_quote=get_quote,
                 request_id=request_id,
+                wallet=wallet,
+                x402_keypair=x402_keypair,
             )
         except (httpx.TransportError, httpx.HTTPError) as exc:
             return _Attempt(label=f"transport_error: {type(exc).__name__}")
@@ -149,6 +166,8 @@ class SovereignClient:
         verify_receipts: bool,
         get_quote: bool,
         request_id: str,
+        wallet: sip_pic.Wallet | None,
+        x402_keypair: KeyPair | None,
     ) -> _Attempt:
         if not self._health_ok(client):
             return _Attempt(label="unhealthy")
@@ -161,29 +180,106 @@ class SovereignClient:
             if quote is None:
                 return _Attempt(label="quote_invalid")
 
-        response = client.post(
-            "/v1/chat/completions",
-            headers=self._completion_headers(request_id=request_id, privacy_mode=privacy_mode),
-            json={"model": model, "messages": messages, "max_tokens": max_tokens},
-        )
+        headers = self._completion_headers(request_id=request_id, privacy_mode=privacy_mode)
+        response = self._post_completion(client, headers, model=model, messages=messages, max_tokens=max_tokens)
+
+        # Reactive 402: pay the exact quoted price and retry the SAME provider once.
+        reserved: list[dict[str, Any]] | None = None
+        if response.status_code == 402:
+            attempt, payment, reserved = self._prepare_payment(response, wallet=wallet, x402_keypair=x402_keypair)
+            if attempt is not None:
+                return attempt
+            response = self._post_completion(
+                client, headers, model=model, messages=messages, max_tokens=max_tokens, payment=payment
+            )
+
         if response.status_code >= 500 or response.status_code == 429:
-            return _Attempt(label=f"http_{response.status_code}")
+            return self._payment_failover("payment_rejected", reserved, wallet, response.status_code)
         if response.status_code != 200:
-            return _Attempt(label=f"http_{response.status_code}")
+            return self._payment_failover("payment_rejected", reserved, wallet, response.status_code)
 
         body = _safe_json(response)
         content = _extract_content(body)
         if content is None:
-            return _Attempt(label="malformed_response")
+            return self._payment_failover("payment_rejected", reserved, wallet, "malformed_response")
 
         receipt = body.get("sip_receipt") if isinstance(body, dict) else None
         if verify_receipts and not self._receipt_trusted(receipt, candidate, content):
-            return _Attempt(label="receipt_unverified")
+            return self._payment_failover("payment_rejected", reserved, wallet, "receipt_unverified")
 
         if quote is not None and not self._quote_honored(quote, receipt, candidate):
-            return _Attempt(label="quote_violated")
+            return self._payment_failover("payment_rejected", reserved, wallet, "quote_violated")
 
         return _Attempt(result=_Served(content=content, receipt=receipt or {}, quote=quote))
+
+    def _post_completion(
+        self,
+        client: httpx.Client,
+        headers: dict[str, str],
+        *,
+        model: str,
+        messages: list[dict[str, str]],
+        max_tokens: int,
+        payment: dict[str, Any] | None = None,
+    ) -> httpx.Response:
+        body: dict[str, Any] = {"model": model, "messages": messages, "max_tokens": max_tokens}
+        if payment is not None:
+            body["sip_payment"] = payment
+        return client.post("/v1/chat/completions", headers=headers, json=body)
+
+    def _prepare_payment(
+        self,
+        response: httpx.Response,
+        *,
+        wallet: sip_pic.Wallet | None,
+        x402_keypair: KeyPair | None,
+    ) -> tuple[_Attempt | None, dict[str, Any] | None, list[dict[str, Any]] | None]:
+        """Build a payment for a 402 challenge, or a failover attempt if unpayable.
+
+        Returns ``(attempt, payment, reserved)``: exactly one of ``attempt`` (the
+        provider cannot be paid -> fail over) or ``payment`` (retry the provider)
+        is set. ``reserved`` holds any PIC vouchers removed from the wallet so the
+        caller can return them if the paid retry is rejected.
+        """
+        body = _safe_json(response)
+        challenge = body.get("sip_payment_required") if isinstance(body, dict) else None
+        if not isinstance(challenge, dict):
+            return _Attempt(label="payment_required"), None, None
+        price = str(challenge.get("price_amount"))
+        unit = str(challenge.get("price_units"))
+        accepted = challenge.get("accepted_schemes")
+        accepted = accepted if isinstance(accepted, list) else []
+
+        if wallet is not None and "pic" in accepted:
+            try:
+                vouchers = wallet.select(price, unit)
+            except sip_pic.InsufficientFunds:
+                return _Attempt(label="insufficient_funds"), None, None
+            return None, sip_pic.build_pic_payment(vouchers), vouchers
+
+        if x402_keypair is not None and "x402" in accepted:
+            payment = sip_pic.build_x402_payment(payer_keypair=x402_keypair, amount=price, unit=unit, now=self._now)
+            return None, payment, None
+
+        return _Attempt(label="payment_required"), None, None
+
+    @staticmethod
+    def _payment_failover(
+        label: str,
+        reserved: list[dict[str, Any]] | None,
+        wallet: sip_pic.Wallet | None,
+        detail: object,
+    ) -> _Attempt:
+        """Fail over after a completion error, returning reserved PIC vouchers.
+
+        When no payment was made (``reserved is None``) this is the pre-existing
+        failover path, labeled by the HTTP/parse ``detail`` exactly as before.
+        """
+        if reserved is None:
+            return _Attempt(label=f"http_{detail}" if isinstance(detail, int) else str(detail))
+        if wallet is not None:
+            wallet.add(*reserved)
+        return _Attempt(label=label)
 
     def _health_ok(self, client: httpx.Client) -> bool:
         response = client.get("/sip/v1/health")

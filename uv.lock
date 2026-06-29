@@ -1062,6 +1062,12 @@ requires-dist = [
 name = "sip-pic"
 version = "0.1.2"
 source = { editable = "packages/pic-vouchers" }
+dependencies = [
+    { name = "sip-protocol" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "sip-protocol", editable = "packages/sip-protocol" }]
 
 [[package]]
 name = "sip-protocol"
@@ -1088,6 +1094,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
     { name = "sin-node" },
+    { name = "sip-pic" },
     { name = "sip-protocol" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -1097,6 +1104,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.110" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "sin-node", editable = "packages/sin-node" },
+    { name = "sip-pic", editable = "packages/pic-vouchers" },
     { name = "sip-protocol", editable = "packages/sip-protocol" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },
 ]
@@ -1119,6 +1127,7 @@ source = { editable = "packages/router" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
+    { name = "sip-pic" },
     { name = "sip-protocol" },
 ]
 
@@ -1126,6 +1135,7 @@ dependencies = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "pydantic", specifier = ">=2.6" },
+    { name = "sip-pic", editable = "packages/pic-vouchers" },
     { name = "sip-protocol", editable = "packages/sip-protocol" },
 ]
 
@@ -1136,6 +1146,7 @@ source = { editable = "apps/router-demo" }
 dependencies = [
     { name = "httpx" },
     { name = "sin-node" },
+    { name = "sip-pic" },
     { name = "sip-protocol" },
     { name = "sip-provider-gateway" },
     { name = "sip-router" },
@@ -1145,6 +1156,7 @@ dependencies = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "sin-node", editable = "packages/sin-node" },
+    { name = "sip-pic", editable = "packages/pic-vouchers" },
     { name = "sip-protocol", editable = "packages/sip-protocol" },
     { name = "sip-provider-gateway", editable = "packages/provider-gateway" },
     { name = "sip-router", editable = "packages/router" },
