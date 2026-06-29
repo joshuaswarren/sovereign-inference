@@ -209,9 +209,33 @@ def _cpu_features(arch: str) -> list[str]:
     return features
 
 
+def _parse_cpu_model_name(cpuinfo_text: str) -> str | None:
+    """Extract the CPU ``model name`` value from /proc/cpuinfo text, or None."""
+    for line in cpuinfo_text.splitlines():
+        if line.lower().startswith("model name"):
+            value = line.partition(":")[2].strip()
+            if value:
+                return value
+    return None
+
+
+def _linux_cpu_model() -> str | None:
+    """Best-effort CPU model name from /proc/cpuinfo on Linux (degrades to None)."""
+    try:
+        text = Path("/proc/cpuinfo").read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return None
+    return _parse_cpu_model_name(text)
+
+
 def _detect_cpu() -> CPUInfo:
     arch = platform.machine()
-    model = platform.processor() or None
+    # Prefer the real chip name from /proc/cpuinfo on Linux (platform.processor()
+    # is usually empty there); fall back to platform.processor(); finally label
+    # Apple Silicon explicitly.
+    model: str | None = _linux_cpu_model() if platform.system() == "Linux" else None
+    if not model:
+        model = platform.processor() or None
     if not model and _is_apple_silicon():
         model = "Apple Silicon"
     return CPUInfo(
