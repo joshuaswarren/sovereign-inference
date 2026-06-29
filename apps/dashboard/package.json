@@ -2,12 +2,24 @@
   "name": "@sovereign-inference/dashboard",
   "version": "0.1.2",
   "private": true,
-  "description": "Local web dashboard for the Sovereign Inference Node (scaffolded — Phase 1).",
+  "description": "Local web dashboard for the Sovereign Inference Node (Phase 1).",
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
-    "dev": "echo \"dashboard scaffolded — see ROADMAP.md (Phase 1)\"",
-    "typecheck": "echo \"(no types yet)\"",
-    "build": "echo \"dashboard scaffolded — see ROADMAP.md (Phase 1)\""
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.11"
   }
 }
