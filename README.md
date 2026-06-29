@@ -50,7 +50,8 @@ This is a real, in-progress build, not a slideware concept. Honest snapshot:
 | `sip-protocol` — canonical JSON, Ed25519, manifests, receipts, JSON-Schema validation | ✅ **implemented + tested** |
 | `sip-receipt` — sign/verify CLI | ✅ **implemented + tested** |
 | JSON Schemas for receipts & manifests | ✅ **authoritative, CI-validated** |
-| Router · provider gateway · SIN node/CLI · PIC · runtime adapters · dashboard | 🚧 scaffolded — see [ROADMAP](ROADMAP.md) |
+| **SIN node** — `sin scan`, recommendation engine, benchmark · `sin` CLI · Ollama & llama.cpp adapters · status API · React dashboard | ✅ **implemented + tested** (Phase 1) |
+| Router · provider gateway · PIC vouchers | 🚧 scaffolded — see [ROADMAP](ROADMAP.md) (Phase 2–3) |
 
 ## Try the working slice (60 seconds)
 
@@ -72,6 +73,19 @@ uv run sip-receipt verify receipt.json      # -> FAIL receipt did not verify
 ```
 
 See [docs/spec/receipts.md](docs/spec/receipts.md) for the format and signing rule.
+
+### Inspect your hardware and pick a model (the SIN node)
+
+```console
+uv run sin scan                          # detect CPU/RAM/GPU/VRAM + installed runtimes
+uv run sin recommend --task coding       # ranked model/quant picks that fit your machine
+uv run sin catalog                       # the curated model catalog
+uv run sin status                        # registered runtime adapters
+```
+
+`sin scan` is cross-platform (macOS/Linux/Windows) and the recommendation engine
+explains *why* each model fits and what tradeoffs it carries. See the
+[SIN PRD](docs/prd/sin.md) and [ROADMAP](ROADMAP.md).
 
 ## Repository layout
 

@@ -3,6 +3,23 @@
 A running log of what's done and what's next. See [ROADMAP.md](ROADMAP.md) for
 the phased plan and [CHANGELOG.md](CHANGELOG.md) for released changes.
 
+## 2026-06-29 — Phase 1: Sovereign Inference Node (local node)
+
+**Done** (branch `feat/phase-1-local-node`, PR pending)
+- `sin_node` core (TDD): models, memory estimator, OpenAI-compatible HTTP client
+  with streaming TTFT/tps timing, runtime-adapter protocol + registry.
+- `sin scan` cross-platform hardware profiler; model recommendation engine over a
+  curated 5-model catalog; Ollama + llama.cpp adapters; `sin benchmark` (signed
+  capability manifest); the `sin` CLI; a FastAPI status API; a React/Vite dashboard.
+- Built via a parallel implementation workflow against frozen core contracts, then
+  an adversarial review workflow; 7 confirmed findings fixed with regression tests.
+- **182 tests pass; ruff + mypy --strict clean.** Live-verified `sin scan` /
+  `sin recommend` on real hardware; dashboard builds.
+
+**Next (Phase 2 — network routing)**
+- Provider registry + resolver; router (scoring, quotes, one-provider-per-request,
+  failover); hardened provider gateway with signed receipts end-to-end.
+
 ## 2026-06-29 — Repository bootstrap
 
 **Done**

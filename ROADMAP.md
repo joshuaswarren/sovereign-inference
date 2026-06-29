@@ -11,14 +11,14 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ Protocol spec v0.1, manifest schemas, receipt format
 - ✅ `sip-protocol`: canonical JSON, Ed25519, receipts, manifests, schema validation (tested)
 - ✅ `sip-receipt` verifier CLI (tested)
-- 🚧 CLI skeletons for `sin` and the router
+- ✅ `sin` CLI implemented (scan/recommend/catalog/serve/install/benchmark/status); router lands in Phase 2
 
-## Phase 1 — Local node  (Weeks 2–3)
-- ⬜ `sin scan` — hardware profiler (CPU/RAM/GPU/VRAM/disk/runtimes)
-- ⬜ Model recommendation engine (fit + quality + speed scoring)
-- ⬜ Local serving via llama.cpp and Ollama adapters (OpenAI-compatible)
-- ⬜ `sin benchmark` — tokens/sec, TTFT, max stable context
-- ⬜ Local web dashboard (React/Vite)
+## Phase 1 — Local node  (Weeks 2–3) — ✅ complete
+- ✅ `sin scan` — hardware profiler (CPU/RAM/GPU/VRAM/disk/runtimes), cross-platform
+- ✅ Model recommendation engine (memory-fit + quality + speed scoring, 5-model catalog)
+- ✅ Local serving via llama.cpp and Ollama adapters (OpenAI-compatible)
+- ✅ `sin benchmark` — tokens/sec, TTFT, max stable context; emits a signed provider manifest
+- ✅ Local web dashboard (React/Vite) + FastAPI status API
 
 ## Phase 2 — Network routing  (Weeks 3–4)
 - ⬜ Provider registry (local JSON) + resolver

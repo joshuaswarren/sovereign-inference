@@ -28,5 +28,21 @@ follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 - DecentralizeAI hackathon plan, evidence map, and article series.
 - Governance, contributing (DCO), security policy, code of conduct, and a split
   Apache-2.0 / AGPL-3.0 licensing model.
+- **Phase 1 — Sovereign Inference Node (local node):**
+  - `sin_node` core: `HardwareProfile`/catalog/recommendation models, a memory
+    estimator, an OpenAI-compatible HTTP client with streaming TTFT/tokens-per-sec
+    timing, and the `RuntimeAdapter` protocol + registry.
+  - `sin scan` cross-platform hardware profiler (CPU/RAM/disk/GPU/VRAM + runtime
+    detection) with human and JSON output.
+  - Model recommendation engine over a curated 5-model catalog (memory-fit +
+    quality + speed scoring with explanations; quant capped at a near-lossless Q8).
+  - Ollama and llama.cpp runtime adapters (detect/serve/health/chat; lifecycle
+    management with subprocess reaping).
+  - `sin benchmark` — tokens/sec, TTFT, and a signed provider capability manifest.
+  - The `sin` CLI: `scan`, `recommend`, `catalog`, `serve`, `install`,
+    `benchmark`, `status`, `version`.
+  - A FastAPI status API and a React/Vite dashboard.
+  - Adversarial review pass: 7 confirmed findings fixed with regression tests
+    (182 tests total; ruff + mypy --strict clean across the typed packages).
 
 [Unreleased]: https://github.com/joshuaswarren/sovereign-inference/commits/main
