@@ -41,6 +41,19 @@ DEFAULT_MODEL_MANIFEST_HASH = "sha256:" + "0" * 64
 DEFAULT_PRIVACY_MODE = "direct"
 
 
+def _payment_required_response(price: str, unit: str, issuers: list[str], accept: list[str]) -> JSONResponse:
+    """The HTTP 402 challenge carrying the exact price for this request."""
+    return JSONResponse(
+        {
+            "error": "payment required",
+            "sip_payment_required": sip_pic.payment_required(
+                price=price, unit=unit, issuer_pubkeys=issuers, accept=accept
+            ),
+        },
+        status_code=402,
+    )
+
+
 class Adapter(Protocol):
     """The minimal runtime-adapter surface the gateway depends on."""
 
@@ -279,48 +292,61 @@ def create_app(
         if limiter is not None and not limiter.allow():
             return JSONResponse({"error": "rate limited"}, status_code=429)
 
-        # 6. payment enforcement (after rate limit, before serving)
+        privacy_mode = request.headers.get("x-sip-privacy-mode", DEFAULT_PRIVACY_MODE)
+        request_id = request.headers.get("x-sip-request-id", "anon")
+
+        # 6. payment — VERIFY only here; the credit is consumed AFTER a successful
+        #    response (charge-on-success), so a runtime failure never burns it.
+        raw_payment = body.get("sip_payment")
+        payment = raw_payment if isinstance(raw_payment, dict) else {}
+        required: str | None = None
         if require_payment:
             billed_input = sum(len(m["content"].split()) for m in messages)
             required = _price_amount(billed_input, max_tokens)
-            payment = body.get("sip_payment")
-            redemption = sip_pic.redeem_payment(
-                payment if isinstance(payment, dict) else {},
+            check = sip_pic.redeem_payment(
+                payment,
                 price=required,
                 unit=price_units,
                 issuer_pubkeys=issuers,
                 spent_set=spend_guard,
                 now=now(),
+                commit=False,
+                provider_pubkey=keypair.public_key_str,
+                request_id=request_id,
             )
-            if not redemption.ok:
-                return JSONResponse(
-                    {
-                        "error": "payment required",
-                        "sip_payment_required": sip_pic.payment_required(
-                            price=required,
-                            unit=price_units,
-                            issuer_pubkeys=issuers,
-                            accept=accepted,
-                        ),
-                    },
-                    status_code=402,
-                )
-            if ledger is not None:
-                ledger.record(
-                    keypair.public_key_str,
-                    required,
-                    price_units,
-                    refs=_payment_refs(payment if isinstance(payment, dict) else {}),
-                )
+            if not check.ok:
+                return _payment_required_response(required, price_units, issuers, accepted)
 
-        privacy_mode = request.headers.get("x-sip-privacy-mode", DEFAULT_PRIVACY_MODE)
-        request_id = request.headers.get("x-sip-request-id", "anon")
-
-        # 7. serve
+        # 7. serve (a runtime failure must NOT consume the payment)
         started = now()
-        result = adapter.chat(model, messages, max_tokens=max_tokens)
+        try:
+            result = adapter.chat(model, messages, max_tokens=max_tokens)
+        except Exception:
+            return JSONResponse({"error": "runtime error serving the model"}, status_code=502)
         completed = now()
 
+        # 8. commit the payment now that a response is in hand; credit the ledger.
+        if require_payment and required is not None:
+            committed = sip_pic.redeem_payment(
+                payment,
+                price=required,
+                unit=price_units,
+                issuer_pubkeys=issuers,
+                spent_set=spend_guard,
+                now=now(),
+                commit=True,
+                provider_pubkey=keypair.public_key_str,
+                request_id=request_id,
+            )
+            if not committed.ok:
+                # Lost a race for the same credit; never double-charge.
+                return _payment_required_response(required, price_units, issuers, accepted)
+            if ledger is not None:
+                ledger.record(keypair.public_key_str, required, price_units, refs=_payment_refs(payment))
+
+        # The receipt attests the price actually charged (the quoted ceiling when
+        # payment is enforced), so receipt == ledger == redeemed for a request.
+        receipt_price = required if required is not None else _price_amount(result.input_tokens, result.output_tokens)
         receipt = sign_receipt(
             build_receipt(
                 request_id=request_id,
@@ -331,7 +357,7 @@ def create_app(
                 input_tokens=result.input_tokens,
                 output_tokens=result.output_tokens,
                 price_units=price_units,
-                price_amount=_price_amount(result.input_tokens, result.output_tokens),
+                price_amount=receipt_price,
                 privacy_mode=privacy_mode,
                 started_at=started,
                 completed_at=completed,

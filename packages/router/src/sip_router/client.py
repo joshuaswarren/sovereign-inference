@@ -186,12 +186,21 @@ class SovereignClient:
         # Reactive 402: pay the exact quoted price and retry the SAME provider once.
         reserved: list[dict[str, Any]] | None = None
         if response.status_code == 402:
-            attempt, payment, reserved = self._prepare_payment(response, wallet=wallet, x402_keypair=x402_keypair)
+            attempt, payment, reserved = self._prepare_payment(
+                response, wallet=wallet, x402_keypair=x402_keypair, candidate=candidate, request_id=request_id
+            )
             if attempt is not None:
                 return attempt
-            response = self._post_completion(
-                client, headers, model=model, messages=messages, max_tokens=max_tokens, payment=payment
-            )
+            try:
+                response = self._post_completion(
+                    client, headers, model=model, messages=messages, max_tokens=max_tokens, payment=payment
+                )
+            except (httpx.TransportError, httpx.HTTPError):
+                # Network fault after vouchers were reserved: return them to the
+                # wallet so they are not lost, then let _try_candidate fail over.
+                if reserved is not None and wallet is not None:
+                    wallet.add(*reserved)
+                raise
 
         if response.status_code >= 500 or response.status_code == 429:
             return self._payment_failover("payment_rejected", reserved, wallet, response.status_code)
@@ -233,6 +242,8 @@ class SovereignClient:
         *,
         wallet: sip_pic.Wallet | None,
         x402_keypair: KeyPair | None,
+        candidate: ProviderEntry,
+        request_id: str,
     ) -> tuple[_Attempt | None, dict[str, Any] | None, list[dict[str, Any]] | None]:
         """Build a payment for a 402 challenge, or a failover attempt if unpayable.
 
@@ -258,7 +269,14 @@ class SovereignClient:
             return None, sip_pic.build_pic_payment(vouchers), vouchers
 
         if x402_keypair is not None and "x402" in accepted:
-            payment = sip_pic.build_x402_payment(payer_keypair=x402_keypair, amount=price, unit=unit, now=self._now)
+            payment = sip_pic.build_x402_payment(
+                payer_keypair=x402_keypair,
+                amount=price,
+                unit=unit,
+                now=self._now,
+                provider_pubkey=candidate.manifest.get("provider_pubkey"),
+                request_id=request_id,
+            )
             return None, payment, None
 
         return _Attempt(label="payment_required"), None, None

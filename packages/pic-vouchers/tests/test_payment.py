@@ -37,6 +37,72 @@ def test_build_pic_payment_shape(issuer: Issuer) -> None:
     assert payment == {"scheme": "pic", "vouchers": vouchers}
 
 
+def test_x402_payment_is_single_use() -> None:
+    # Regression: a captured x402 payment must not be replayable for free service.
+    payer = KeyPair.generate()
+    prov = KeyPair.generate()
+    payment = build_x402_payment(
+        payer_keypair=payer, amount="1.0", unit="pic", now=_now, provider_pubkey=prov.public_key_str, request_id="req-1"
+    )
+    spent = SpentSet()
+    first = redeem_payment(
+        payment,
+        price="1.0",
+        unit="pic",
+        issuer_pubkeys=[],
+        spent_set=spent,
+        now=FIXED_NOW,
+        provider_pubkey=prov.public_key_str,
+        request_id="req-1",
+    )
+    assert first.ok
+    second = redeem_payment(
+        payment,
+        price="1.0",
+        unit="pic",
+        issuer_pubkeys=[],
+        spent_set=spent,
+        now=FIXED_NOW,
+        provider_pubkey=prov.public_key_str,
+        request_id="req-1",
+    )
+    assert not second.ok
+    assert second.reason == "double_spend"
+
+
+def test_x402_payment_is_provider_and_request_bound() -> None:
+    # Regression: an x402 payment is bound to one provider + request, so a captured
+    # payment cannot be replayed to a different gateway or for a different call.
+    payer = KeyPair.generate()
+    prov = KeyPair.generate()
+    other = KeyPair.generate()
+    payment = build_x402_payment(
+        payer_keypair=payer, amount="1.0", unit="pic", now=_now, provider_pubkey=prov.public_key_str, request_id="req-1"
+    )
+    wrong_provider = redeem_payment(
+        payment,
+        price="1.0",
+        unit="pic",
+        issuer_pubkeys=[],
+        spent_set=SpentSet(),
+        now=FIXED_NOW,
+        provider_pubkey=other.public_key_str,
+        request_id="req-1",
+    )
+    assert not wrong_provider.ok
+    wrong_request = redeem_payment(
+        payment,
+        price="1.0",
+        unit="pic",
+        issuer_pubkeys=[],
+        spent_set=SpentSet(),
+        now=FIXED_NOW,
+        provider_pubkey=prov.public_key_str,
+        request_id="req-2",
+    )
+    assert not wrong_request.ok
+
+
 def test_redeem_happy_path_marks_spent(issuer: Issuer) -> None:
     vouchers = issuer.issue("1.00", count=2, now=_now)
     payment = build_pic_payment(vouchers)

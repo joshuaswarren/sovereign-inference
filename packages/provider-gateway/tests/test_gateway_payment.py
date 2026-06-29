@@ -185,10 +185,17 @@ def test_x402_payment_at_or_above_price_serves(provider_keypair: KeyPair, issuer
     client = make_paid_client(provider_keypair, issuer, ledger=ledger)
 
     payer = KeyPair.generate()
-    payment = sip_pic.build_x402_payment(payer_keypair=payer, amount=EXPECTED_PRICE, unit="pic")
+    payment = sip_pic.build_x402_payment(
+        payer_keypair=payer,
+        amount=EXPECTED_PRICE,
+        unit="pic",
+        provider_pubkey=provider_keypair.public_key_str,
+        request_id="req-x402",
+    )
 
     resp = client.post(
         "/v1/chat/completions",
+        headers={"x-sip-request-id": "req-x402"},
         json={
             "model": "echo-model",
             "messages": [PROMPT],
@@ -219,3 +226,90 @@ def test_payment_not_required_serves_without_payment(provider_keypair: KeyPair) 
     )
     assert resp.status_code == 200
     assert verify_receipt(resp.json()["sip_receipt"]).valid is True
+
+
+# --------------------------------------------------------------------------- #
+# regression: a runtime error must NOT consume the payment (charge-on-success)
+# --------------------------------------------------------------------------- #
+class _RaisingAdapter:
+    name = "llama.cpp"
+
+    def chat(self, model: str, messages: list[dict[str, str]], *, max_tokens: int = 256, **kwargs: object) -> object:
+        raise RuntimeError("model runtime exploded")
+
+
+def test_runtime_error_does_not_consume_payment(provider_keypair: KeyPair, issuer: sip_pic.Issuer) -> None:
+    spent = sip_pic.SpentSet()
+    app = create_app(
+        adapter=_RaisingAdapter(),
+        keypair=provider_keypair,
+        allowed_models=ALLOWED,
+        require_payment=True,
+        pic_issuers=[issuer.pubkey],
+        price_units="pic",
+        input_per_1m=INPUT_PER_1M,
+        output_per_1m="0",
+        spent_set=spent,
+    )
+    client = TestClient(app, raise_server_exceptions=False)
+    wallet = sip_pic.Wallet()
+    wallet.add(*issuer.issue("5", count=1))
+    vouchers = wallet.select(EXPECTED_PRICE, "pic")
+
+    resp = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "echo-model",
+            "messages": [PROMPT],
+            "max_tokens": 16,
+            "sip_payment": sip_pic.build_pic_payment(vouchers),
+        },
+    )
+    assert resp.status_code == 502
+    # The credit must NOT have been consumed — the request was never served.
+    assert spent.is_spent(vouchers[0]["voucher_id"]) is False
+
+
+# --------------------------------------------------------------------------- #
+# regression: the signed receipt attests the price actually charged
+# --------------------------------------------------------------------------- #
+def test_receipt_price_equals_charged_with_nonzero_output_price(
+    provider_keypair: KeyPair, issuer: sip_pic.Issuer
+) -> None:
+    ledger = sip_pic.Ledger()
+    app = create_app(
+        adapter=MockAdapter(),
+        keypair=provider_keypair,
+        allowed_models=ALLOWED,
+        require_payment=True,
+        pic_issuers=[issuer.pubkey],
+        price_units="pic",
+        input_per_1m=INPUT_PER_1M,
+        output_per_1m="1000000",  # NONZERO output price -> charged != token-based receipt
+        ledger=ledger,
+    )
+    client = TestClient(app)
+    wallet = sip_pic.Wallet()
+    wallet.add(*issuer.issue("1000", count=1))
+
+    challenge = client.post(
+        "/v1/chat/completions",
+        json={"model": "echo-model", "messages": [PROMPT], "max_tokens": 16},
+    ).json()["sip_payment_required"]
+    required = challenge["price_amount"]
+    vouchers = wallet.select(required, "pic")
+
+    resp = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "echo-model",
+            "messages": [PROMPT],
+            "max_tokens": 16,
+            "sip_payment": sip_pic.build_pic_payment(vouchers),
+        },
+    )
+    assert resp.status_code == 200
+    receipt = resp.json()["sip_receipt"]
+    # receipt price == the amount actually charged == the ledger credit.
+    assert receipt["price_amount"] == required
+    assert ledger.balance(provider_keypair.public_key_str, "pic") == Decimal(required)

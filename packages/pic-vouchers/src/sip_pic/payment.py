@@ -18,7 +18,7 @@ from typing import Any
 from sip_protocol import verify_voucher, voucher_is_expired
 
 from .spentset import SpentSet
-from .x402 import verify_x402_payment
+from .x402 import verify_x402_payment, x402_nonce
 
 
 @dataclass(frozen=True)
@@ -79,6 +79,7 @@ def _redeem_pic(
     issuer_pubkeys: list[str],
     spent_set: SpentSet,
     now: datetime,
+    commit: bool,
 ) -> RedeemResult:
     vouchers = payment.get("vouchers")
     if not isinstance(vouchers, list) or not vouchers:
@@ -92,12 +93,14 @@ def _redeem_pic(
             return RedeemResult(ok=False, scheme="pic", total="0", reason="double_spend")
         seen.add(voucher_id)
 
-    # Validate every voucher before consuming anything.
+    # Validate every voucher (and reject any already spent) before consuming.
     total = Decimal("0")
     for voucher in vouchers:
         reason = _validate_voucher(voucher, unit=unit, issuer_pubkeys=issuer_pubkeys, now=now)
         if reason is not None:
             return RedeemResult(ok=False, scheme="pic", total="0", reason=reason)
+        if spent_set.is_spent(voucher["voucher_id"]):
+            return RedeemResult(ok=False, scheme="pic", total="0", reason="double_spend")
         try:
             total += Decimal(voucher["denomination"])
         except (InvalidOperation, KeyError, TypeError):
@@ -105,6 +108,10 @@ def _redeem_pic(
 
     if total < Decimal(price):
         return RedeemResult(ok=False, scheme="pic", total=str(total), reason="insufficient")
+
+    if not commit:
+        # Verify only: do not consume (used to charge-on-success after serving).
+        return RedeemResult(ok=True, scheme="pic", total=str(total), reason="")
 
     # Atomic spend: mark every id, rolling back the whole batch on any collision.
     spent_ids: list[str] = []
@@ -128,12 +135,18 @@ def redeem_payment(
     issuer_pubkeys: list[str],
     spent_set: SpentSet,
     now: datetime,
+    commit: bool = True,
+    provider_pubkey: str | None = None,
+    request_id: str | None = None,
 ) -> RedeemResult:
-    """Verify and (for ``pic``) atomically consume ``payment`` against ``price``.
+    """Verify and (when ``commit``) consume ``payment`` against ``price``.
 
-    On any failure the result carries ``ok=False`` and a machine-readable
-    ``reason``; for ``pic`` payments no voucher is consumed unless the entire
-    batch succeeds.
+    With ``commit=False`` the payment is only validated (nothing is spent), so a
+    caller can charge-on-success: verify before serving, then call again with
+    ``commit=True`` to consume the credit only once a response is in hand. PIC
+    redemption is all-or-nothing; x402 payments are single-use per ``nonce`` and
+    bound to ``provider_pubkey`` / ``request_id`` when those are supplied. On any
+    failure the result carries ``ok=False`` and a machine-readable ``reason``.
     """
     scheme = payment.get("scheme")
     if scheme == "pic":
@@ -144,10 +157,22 @@ def redeem_payment(
             issuer_pubkeys=issuer_pubkeys,
             spent_set=spent_set,
             now=now,
+            commit=commit,
         )
     if scheme == "x402":
-        if verify_x402_payment(payment, price=price, unit=unit, now=now):
-            amount = payment.get("payment", {}).get("amount", price)
-            return RedeemResult(ok=True, scheme="x402", total=str(amount), reason="")
-        return RedeemResult(ok=False, scheme="x402", total="0", reason="insufficient")
+        nonce = x402_nonce(payment)
+        if nonce is None:
+            return RedeemResult(ok=False, scheme="x402", total="0", reason="invalid_payment")
+        if not verify_x402_payment(
+            payment, price=price, unit=unit, now=now, provider_pubkey=provider_pubkey, request_id=request_id
+        ):
+            return RedeemResult(ok=False, scheme="x402", total="0", reason="insufficient")
+        spent_key = "x402:" + nonce
+        if spent_set.is_spent(spent_key):
+            return RedeemResult(ok=False, scheme="x402", total="0", reason="double_spend")
+        if commit and not spent_set.spend(spent_key):
+            return RedeemResult(ok=False, scheme="x402", total="0", reason="double_spend")
+        inner = payment.get("payment")
+        amount = inner.get("amount", price) if isinstance(inner, dict) else price
+        return RedeemResult(ok=True, scheme="x402", total=str(amount), reason="")
     return RedeemResult(ok=False, scheme=str(scheme), total="0", reason="unsupported_scheme")

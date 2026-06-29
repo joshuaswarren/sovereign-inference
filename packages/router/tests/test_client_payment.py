@@ -100,12 +100,14 @@ class PayingGateway:
         accepted_schemes: list[str] | None = None,
         always_402: bool = False,
         paid_status: int = 200,
+        raise_on_paid: bool = False,
     ) -> None:
         self.kp = kp
         self.content = content
         self.accepted_schemes = accepted_schemes if accepted_schemes is not None else ["pic", "x402"]
         self.always_402 = always_402
         self.paid_status = paid_status
+        self.raise_on_paid = raise_on_paid
         self.manifest = _manifest(kp)
         self.completion_calls = 0
         self.payments_seen: list[dict[str, Any]] = []
@@ -136,6 +138,8 @@ class PayingGateway:
             if payment is None or self.always_402:
                 return httpx.Response(402, json=self._challenge())
             self.payments_seen.append(payment)
+            if self.raise_on_paid:
+                raise httpx.ConnectError("paid-retry network blip", request=request)
             if self.paid_status != 200:
                 return httpx.Response(self.paid_status, json={"error": "rejected"})
             return httpx.Response(200, json=_completion_body(self.kp, content=self.content))
@@ -213,6 +217,25 @@ def test_pic_payment_402_then_paid_retry_succeeds() -> None:
     # Wallet was debited: started with a single 10-pic voucher, spent it on a 5 price.
     assert wallet.balance(UNIT) == Decimal("0")
     assert result.attempts[-1]["outcome"] == "ok"
+
+
+def test_paid_retry_transport_error_returns_vouchers_and_fails_over() -> None:
+    # Regression: a network fault on the paid retry must NOT lose the user's
+    # vouchers — they are returned to the wallet and the client fails over.
+    pay_kp = KeyPair.generate()
+    free_kp = KeyPair.generate()
+    paying = PayingGateway(pay_kp, raise_on_paid=True)
+    free = FreeGateway(free_kp, content="free fallback")
+    wallet = _funded_wallet(pay_kp, denomination="10")
+    before = wallet.balance(UNIT)
+    registry = _registry(_entry("http://pay", paying), _entry("http://free", free))
+    client = SovereignClient(registry, client_factory=_factory({"http://pay": paying, "http://free": free}))
+
+    result = client.chat(MODEL, MESSAGES, wallet=wallet)
+
+    assert wallet.balance(UNIT) == before  # vouchers returned, not lost
+    assert result.base_url == "http://free"
+    assert result.content == "free fallback"
 
 
 def test_x402_payment_402_then_paid_retry_succeeds() -> None:
