@@ -88,6 +88,23 @@ def test_parse_rocm_smi_empty() -> None:
     assert parse_rocm_smi("device,Card series\n") == []
 
 
+# Same data, but the "Used" column precedes the "Total" column. The 'used'
+# header also contains vram/total/memory, so a naive first-match would mislabel
+# total as ~1 GB. Total must still resolve to ~24 GB regardless of order.
+ROCM_SMI_CSV_USED_FIRST = (
+    "device,Card series,VRAM Total Used Memory (B),VRAM Total Memory (B)\n"
+    "card0,Radeon RX 7900 XTX,1073741824,25753026560\n"
+)
+
+
+def test_parse_rocm_smi_used_column_before_total() -> None:
+    gpus = parse_rocm_smi(ROCM_SMI_CSV_USED_FIRST)
+    assert len(gpus) == 1
+    gpu = gpus[0]
+    assert gpu.vram_total_gb is not None and 23.0 < gpu.vram_total_gb < 25.0
+    assert gpu.vram_free_gb is not None and 22.0 < gpu.vram_free_gb < 24.0
+
+
 # --- runtime detection ------------------------------------------------------
 
 
@@ -209,9 +226,10 @@ def test_render_is_plain_text_with_key_fields() -> None:
 # --- scan injection (deterministic, no real subprocess) ---------------------
 
 
-def test_scan_injects_nvidia_runner_for_linux_like_path() -> None:
-    # Provide a fake runner that pretends nvidia-smi exists and returns 1 GPU,
-    # a which that finds nvidia-smi + ollama, and a probe that is offline.
+def test_scan_forces_non_apple_path_and_detects_injected_nvidia_gpu() -> None:
+    # Force the discrete-GPU path (is_apple_silicon=False) so this is a real
+    # assertion even on an Apple-Silicon dev/CI host: the injected nvidia-smi
+    # output must be wired into the profile.
     def runner(cmd: list[str]) -> str:
         if cmd and cmd[0] == "nvidia-smi":
             return "NVIDIA RTX 4090, 24564, 23000, 550.54.14\n"
@@ -222,14 +240,15 @@ def test_scan_injects_nvidia_runner_for_linux_like_path() -> None:
             return f"/usr/bin/{name}"
         return None
 
-    profile = scan(runner=runner, which=which, http_probe=lambda url: None)
+    profile = scan(runner=runner, which=which, http_probe=lambda url: None, is_apple_silicon=False)
     assert isinstance(profile, HardwareProfile)
-    # On a non-NVIDIA host this still must not crash; GPUs come from the runner.
-    names = [g.name for g in profile.gpus]
-    # The NVIDIA GPU is present only if this host reports cuda-capable;
-    # at minimum the profile is a valid object with a known accelerator.
-    assert profile.accelerator in set(Accelerator)
-    assert isinstance(names, list)
+    nvidia = [g for g in profile.gpus if g.vendor == GpuVendor.nvidia]
+    assert len(nvidia) == 1
+    assert nvidia[0].name == "NVIDIA RTX 4090"
+    assert nvidia[0].vram_total_gb is not None and 23.5 < nvidia[0].vram_total_gb < 24.5
+    assert profile.accelerator == Accelerator.cuda
+    assert profile.unified_memory is False
+    assert any(r.name == "ollama" and r.available for r in profile.runtimes)
 
 
 # --- real-scan smoke test ---------------------------------------------------

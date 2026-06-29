@@ -49,6 +49,14 @@ def _print_json(payload: Any) -> None:
     print(json.dumps(payload, indent=2))
 
 
+def _positive_int(value: str) -> int:
+    """argparse type: a positive integer (mirrors the API's ``ge=1`` contract)."""
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError(f"must be a positive integer, got {value}")
+    return parsed
+
+
 # --------------------------------------------------------------------- scan
 
 
@@ -244,7 +252,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_rec = sub.add_parser("recommend", help="recommend model/runtime/quant combinations for a task")
     p_rec.add_argument("--task", required=True, help="task to optimize for, e.g. coding, chat, embeddings")
     p_rec.add_argument("--commercial", action="store_true", help="require a commercial-use license")
-    p_rec.add_argument("--top", type=int, default=3, help="maximum number of recommendations (default 3)")
+    p_rec.add_argument("--top", type=_positive_int, default=3, help="maximum number of recommendations (default 3)")
     p_rec.add_argument("--json", action="store_true", help="emit recommendations as JSON")
     p_rec.set_defaults(func=cmd_recommend)
 

@@ -197,8 +197,32 @@ class LlamaCppAdapter(OpenAICompatibleAdapter):  # base untyped (no py.typed)
             self._served_model = None
 
     @staticmethod
-    def _terminate(process: Any) -> None:
+    def _terminate(process: Any, *, timeout: float = 5.0) -> None:
+        """Terminate, reap, and escalate to SIGKILL if SIGTERM is ignored.
+
+        Without ``wait()`` the child would linger as a zombie; without a ``kill()``
+        fallback a wedged server would keep holding its port/GPU. Every step is
+        guarded so a partially-mocked or already-dead process never raises, and
+        the method stays safe to call repeatedly.
+        """
         terminate = getattr(process, "terminate", None)
+        wait = getattr(process, "wait", None)
+        kill = getattr(process, "kill", None)
+
         if callable(terminate):
             with contextlib.suppress(OSError):
                 terminate()
+        if callable(wait):
+            try:
+                wait(timeout=timeout)
+                return  # exited after SIGTERM
+            except subprocess.TimeoutExpired:
+                pass  # still alive -> escalate to SIGKILL
+            except OSError:
+                return  # already gone / not waitable
+        if callable(kill):
+            with contextlib.suppress(OSError):
+                kill()
+        if callable(wait):
+            with contextlib.suppress(subprocess.TimeoutExpired, OSError):
+                wait(timeout=timeout)

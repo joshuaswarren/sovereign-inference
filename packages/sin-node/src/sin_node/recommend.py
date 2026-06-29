@@ -83,19 +83,29 @@ def _estimate_for(model: CatalogModel, quant: QuantOption, context: int) -> Memo
     )
 
 
-def _select_quant(model: CatalogModel, usable_gb: float, context: int) -> tuple[QuantOption, MemoryEstimate, bool]:
-    """Pick the largest quant that fits; else the smallest quant (marked unfit).
+# Above this many effective bits per weight, extra precision costs memory and
+# throughput for negligible inference-quality gain. We never auto-select a quant
+# above this ceiling, so e.g. Q8_0 is preferred over F16 even when both fit. This
+# keeps the chosen quant consistent with the speed-aware score we advertise.
+_QUALITY_SATURATION_BITS = 8.5
 
-    Returns ``(quant, estimate, fits)``. "Largest" and "smallest" are by
-    effective bits per weight, since more bits means higher quality but more
-    memory.
+
+def _select_quant(model: CatalogModel, usable_gb: float, context: int) -> tuple[QuantOption, MemoryEstimate, bool]:
+    """Pick the largest quant that fits, capped at a near-lossless quality point.
+
+    Returns ``(quant, estimate, fits)``. Candidates are considered in ascending
+    effective bits; we keep the largest that fits up to ``_QUALITY_SATURATION_BITS``
+    so F16 is never chosen over Q8_0 for no quality benefit (and the model is not
+    advertised at the slowest variant). If nothing fits even at the smallest
+    quant, returns that smallest quant marked unfit.
     """
     by_bits = sorted(model.quants, key=lambda q: q.bits)
+    considered = [q for q in by_bits if q.bits <= _QUALITY_SATURATION_BITS] or by_bits
     best_fit: tuple[QuantOption, MemoryEstimate] | None = None
-    for quant in by_bits:  # ascending bits
+    for quant in considered:  # ascending bits
         estimate = _estimate_for(model, quant, context)
         if estimate.total_gb <= usable_gb:
-            best_fit = (quant, estimate)  # keep climbing for the largest fit
+            best_fit = (quant, estimate)  # keep climbing for the largest fit under the cap
     if best_fit is not None:
         return best_fit[0], best_fit[1], True
     smallest = by_bits[0]
@@ -171,7 +181,11 @@ def recommend(
     predicts throughput, and scores a weighted blend. Returns up to ``top_k``
     recommendations ranked by score, fitting models first. Returns ``[]`` when
     no catalog model serves the task.
+
+    Raises ``ValueError`` if ``top_k < 1`` (mirrors the API's ``ge=1`` contract).
     """
+    if top_k < 1:
+        raise ValueError(f"top_k must be >= 1, got {top_k}")
     models = catalog if catalog is not None else load_catalog()
     speed_weight = _LATENCY_SPEED_WEIGHT.get(latency, _LATENCY_SPEED_WEIGHT["balanced"])
     usable_gb = profile.usable_memory_gb()
@@ -186,7 +200,13 @@ def recommend(
     for model in candidates:
         context = model.default_context
         quant, estimate, fits = _select_quant(model, usable_gb, context)
-        headroom_ratio = round(usable_gb / estimate.total_gb, 3) if estimate.total_gb > 0 else 0.0
+        if estimate.total_gb > 0:
+            headroom_ratio = round(usable_gb / estimate.total_gb, 3)
+            if not fits and headroom_ratio >= 1.0:
+                # Rounding guard: never display as fitting when it does not.
+                headroom_ratio = 0.999
+        else:
+            headroom_ratio = 0.0
         runtime = model.recommended_runtimes[0] if model.recommended_runtimes else "llama.cpp"
         predicted_tps = predict_tps(model.params_b, profile.accelerator, quant.bits)
         score = _score(

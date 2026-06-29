@@ -7,6 +7,8 @@ injected so these unit tests never touch the real system or spawn a process.
 
 from __future__ import annotations
 
+import subprocess
+
 import httpx
 import pytest
 from sip_runtime_llamacpp.adapter import LlamaCppAdapter
@@ -15,18 +17,30 @@ from sin_node.adapter import OpenAICompatibleAdapter, ServerHandle, get_adapter
 
 
 class FakeProcess:
-    """Stand-in for ``subprocess.Popen`` returned by a fake spawn."""
+    """Stand-in for ``subprocess.Popen`` returned by a fake spawn.
 
-    def __init__(self, pid: int = 4321) -> None:
+    A ``wedged`` process ignores SIGTERM: the post-terminate ``wait`` times out
+    until it is ``kill``ed, modeling a server that must be escalated to SIGKILL.
+    """
+
+    def __init__(self, pid: int = 4321, *, wedged: bool = False) -> None:
         self.pid = pid
         self.terminated = False
         self.killed = False
+        self.wait_calls = 0
+        self._wedged = wedged
 
     def terminate(self) -> None:
         self.terminated = True
 
     def kill(self) -> None:
         self.killed = True
+
+    def wait(self, timeout: float | None = None) -> int:
+        self.wait_calls += 1
+        if self._wedged and not self.killed:
+            raise subprocess.TimeoutExpired(cmd="llama-server", timeout=timeout)
+        return 0
 
 
 def _mock_client(handler: object) -> httpx.Client:
@@ -235,6 +249,36 @@ def test_stop_terminates_running_process() -> None:
 def test_stop_is_safe_without_running_process() -> None:
     # Should degrade gracefully (no crash) when nothing is running.
     LlamaCppAdapter().stop()
+
+
+def test_stop_reaps_process_and_does_not_kill_on_clean_exit() -> None:
+    proc = FakeProcess()
+    adapter = LlamaCppAdapter()
+    adapter.serve(
+        "/models/m.gguf",
+        spawn=lambda cmd: proc,
+        health_check=lambda base_url: True,
+        sleep=lambda s: None,
+    )
+    adapter.stop()
+    assert proc.terminated is True
+    assert proc.wait_calls >= 1  # reaped, not left a zombie
+    assert proc.killed is False  # clean SIGTERM exit needs no SIGKILL
+
+
+def test_stop_escalates_to_kill_when_terminate_is_ignored() -> None:
+    proc = FakeProcess(wedged=True)
+    adapter = LlamaCppAdapter()
+    adapter.serve(
+        "/models/m.gguf",
+        spawn=lambda cmd: proc,
+        health_check=lambda base_url: True,
+        sleep=lambda s: None,
+    )
+    adapter.stop()
+    assert proc.terminated is True
+    assert proc.killed is True  # wedged server escalated to SIGKILL
+    assert proc.wait_calls >= 2  # waited, timed out, killed, reaped
 
 
 def test_registered_in_registry() -> None:

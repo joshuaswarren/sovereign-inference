@@ -13,11 +13,22 @@ from collections.abc import Callable
 
 import httpx
 import pytest
-from sip_runtime_ollama.adapter import DEFAULT_BASE_URL, OllamaAdapter
+from sip_runtime_ollama.adapter import DEFAULT_BASE_URL, OllamaAdapter, _pull_client
 
 
 def make_client(handler: Callable[[httpx.Request], httpx.Response]) -> httpx.Client:
     return httpx.Client(transport=httpx.MockTransport(handler), base_url=DEFAULT_BASE_URL)
+
+
+def test_pull_client_has_finite_read_timeout() -> None:
+    # The production pull path (no injected client) must NOT disable the read
+    # timeout, or a stalled stream would hang `sin install` forever.
+    client = _pull_client()
+    try:
+        assert client.timeout.read is not None
+        assert client.timeout.connect is not None
+    finally:
+        client.close()
 
 
 def test_name_and_default_base_url() -> None:

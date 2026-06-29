@@ -30,6 +30,17 @@ DEFAULT_BASE_URL = "http://localhost:11434"
 
 WhichFn = Callable[[str], str | None]
 
+# Model pulls are legitimately long, so the overall timeout is unbounded, but a
+# finite read/connect timeout ensures a stalled or half-open stream eventually
+# raises (and is then handled) instead of hanging the CLI forever.
+_PULL_READ_TIMEOUT_S = 60.0
+_PULL_CONNECT_TIMEOUT_S = 10.0
+
+
+def _pull_client() -> httpx.Client:
+    """Client for streaming pulls: no total deadline, but finite read/connect."""
+    return httpx.Client(timeout=httpx.Timeout(None, read=_PULL_READ_TIMEOUT_S, connect=_PULL_CONNECT_TIMEOUT_S))
+
 
 class OllamaAdapter(OpenAICompatibleAdapter):
     """Runtime adapter for a local Ollama server."""
@@ -101,7 +112,7 @@ class OllamaAdapter(OpenAICompatibleAdapter):
         Failures degrade silently; callers verify availability separately.
         """
         owns = self._client is None
-        client = self._client or httpx.Client(timeout=None)
+        client = self._client or _pull_client()
         try:
             with client.stream(
                 "POST",

@@ -130,6 +130,14 @@ def test_recommend_human_renders_table(monkeypatch: pytest.MonkeyPatch, capsys: 
     assert "Qwen Coder 7B" in capsys.readouterr().out
 
 
+def test_recommend_rejects_nonpositive_top() -> None:
+    # argparse rejects --top 0/-1 cleanly (exit code 2) before recommend() runs.
+    for bad in ("0", "-1"):
+        with pytest.raises(SystemExit) as exc:
+            cli.main(["recommend", "--task", "coding", "--top", bad])
+        assert exc.value.code == 2
+
+
 # ---------------------------------------------------------------- catalog
 
 

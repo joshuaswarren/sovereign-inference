@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+import pytest
+
 from sin_node.catalog import load_catalog
+from sin_node.memory import estimate_memory
 from sin_node.models import (
     Accelerator,
     CatalogModel,
@@ -86,13 +89,58 @@ def test_tiny_profile_marks_large_models_as_not_fitting() -> None:
         assert any("memory" in t.lower() or "fit" in t.lower() for t in r.tradeoffs)
 
 
-def test_prefers_largest_quant_that_fits_per_model() -> None:
-    # On a 24GB GPU a 3B model fits even at F16, so the chosen quant should be
-    # the highest-bit option, not the smallest.
+def test_prefers_largest_quant_that_fits_but_caps_at_q8() -> None:
+    # On a 24GB GPU a 3B model fits even at F16, but quant selection is capped at
+    # a near-lossless point (Q8_0): F16 doubles memory and halves speed for no
+    # quality gain, so Q8_0 is the sensible top choice, not F16.
     recs = recommend(_big_cuda_profile(), task="general-chat", top_k=10)
     llama = next(r for r in recs if r.model_id == "llama-3.2-3b-instruct")
-    assert llama.quant == "F16"
+    assert llama.quant == "Q8_0"
     assert llama.fits is True
+
+
+def test_top_k_must_be_positive() -> None:
+    for bad in (0, -1, -5):
+        with pytest.raises(ValueError, match="top_k"):
+            recommend(_big_cuda_profile(), task="coding", top_k=bad)
+
+
+def test_headroom_ratio_stays_below_one_when_just_not_fitting() -> None:
+    # A model whose memory need is just barely above usable must report
+    # headroom_ratio < 1.0 even though usable/total rounds to 1.0.
+    model = CatalogModel(
+        model_id="edge-1b",
+        display_name="Edge 1B",
+        params_b=1.0,
+        quants=[QuantOption(name="Q4_K_M", bits=4.5)],
+        tasks=["coding"],
+        license="apache-2.0",
+        recommended_runtimes=["llama.cpp"],
+        context_options=[4096],
+        default_context=4096,
+        n_layers=16,
+        hidden_size=2048,
+        n_heads=16,
+        n_kv_heads=4,
+        quality_score=0.5,
+    )
+    est = estimate_memory(1.0, 4.5, 4096, n_layers=16, hidden_size=2048, n_kv_heads=4, n_heads=16)
+    usable = est.total_gb * 0.9997  # just under: does not fit, but ratio rounds to 1.0
+    profile = HardwareProfile(
+        os="Linux",
+        os_version="6",
+        arch="x86_64",
+        cpu=CPUInfo(arch="x86_64", physical_cores=4, logical_cores=8),
+        ram_total_gb=64.0,
+        ram_available_gb=8.0,
+        disk_free_gb=100.0,
+        gpus=[GPUInfo(vendor=GpuVendor.nvidia, name="X", vram_total_gb=usable)],
+        accelerator=Accelerator.cuda,
+        unified_memory=False,
+    )
+    rec = recommend(profile, task="coding", catalog=[model])[0]
+    assert rec.fits is False
+    assert rec.headroom_ratio < 1.0
 
 
 def test_commercial_required_filters_non_commercial_licenses() -> None:

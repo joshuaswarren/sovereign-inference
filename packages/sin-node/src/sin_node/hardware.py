@@ -138,8 +138,20 @@ def parse_rocm_smi(csv_text: str) -> list[GPUInfo]:
         return None
 
     name_idx = _find("card", "series") or _find("series")
-    total_idx = _find("vram", "total", "memory")
     used_idx = _find("vram", "used")
+
+    def _find_total() -> int | None:
+        # rocm-smi's "used" header ("VRAM Total Used Memory (B)") also contains
+        # vram/total/memory, so we must exclude it (and any "used" column) and
+        # not depend on column ordering.
+        for idx, col in enumerate(header):
+            if idx == used_idx or "used" in col:
+                continue
+            if all(needle in col for needle in ("vram", "total", "memory")):
+                return idx
+        return None
+
+    total_idx = _find_total()
 
     gpus: list[GPUInfo] = []
     for line in lines[1:]:
@@ -211,9 +223,9 @@ def _detect_cpu() -> CPUInfo:
     )
 
 
-def _detect_gpus(runner: Runner, which: Which) -> list[GPUInfo]:
+def _detect_gpus(runner: Runner, which: Which, *, is_apple_silicon: bool) -> list[GPUInfo]:
     """Detect GPUs across vendors, degrading to an empty list on any failure."""
-    if _is_apple_silicon():
+    if is_apple_silicon:
         # Apple Silicon: the SoC GPU shares unified memory; report one GPU.
         model = platform.processor() or "Apple Silicon"
         return [GPUInfo(vendor=GpuVendor.apple, name=f"{model} GPU")]
@@ -319,11 +331,14 @@ def scan(
     runner: Runner = _default_runner,
     which: Which = shutil.which,
     http_probe: HttpProbe = _default_http_probe,
+    is_apple_silicon: bool | None = None,
 ) -> HardwareProfile:
     """Build a :class:`HardwareProfile` for this machine.
 
     All external calls are injected so the function is fully testable; in
-    production the real defaults touch the system. Any individual detection
+    production the real defaults touch the system. ``is_apple_silicon`` defaults
+    to live platform detection but can be forced (e.g. to exercise the
+    discrete-GPU path on an Apple-Silicon CI host). Any individual detection
     failure degrades to empty/unknown rather than raising.
     """
     os_name = platform.system() or "unknown"
@@ -335,8 +350,8 @@ def scan(
     ram_available_gb = round(vmem.available / _BYTES_PER_GB, 2)
     disk_free_gb = _home_disk_free_gb()
 
-    apple = _is_apple_silicon()
-    gpus = _detect_gpus(runner, which)
+    apple = _is_apple_silicon() if is_apple_silicon is None else is_apple_silicon
+    gpus = _detect_gpus(runner, which, is_apple_silicon=apple)
     accelerator = resolve_accelerator(gpus, is_apple_silicon=apple)
 
     return HardwareProfile(
