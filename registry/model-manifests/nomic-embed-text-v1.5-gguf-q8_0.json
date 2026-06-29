@@ -1,0 +1,17 @@
+{
+  "schema": "sip-ai.model_manifest.v1",
+  "model_id": "nomic-embed-text-v1.5-gguf-q8_0",
+  "display_name": "Nomic Embed Text v1.5 GGUF Q8_0",
+  "source_repo": "huggingface:nomic-ai/nomic-embed-text-v1.5-GGUF",
+  "weights_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "format": "GGUF",
+  "quantization": "Q8_0",
+  "license": "apache-2.0",
+  "commercial_use": true,
+  "recommended_runtimes": ["ollama", "llama.cpp"],
+  "min_memory_gb": 1,
+  "recommended_memory_gb": 2,
+  "context_tested": [2048, 8192],
+  "tasks": ["embeddings"],
+  "manifest_uri": "arweave://PLACEHOLDER_TX_ID"
+}

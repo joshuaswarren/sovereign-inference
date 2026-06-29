@@ -29,3 +29,9 @@ jobs:
 
       - name: Build SDK
         run: pnpm --filter @sovereign-inference/sdk build
+
+      - name: Typecheck dashboard
+        run: pnpm --filter @sovereign-inference/dashboard typecheck
+
+      - name: Build dashboard
+        run: pnpm --filter @sovereign-inference/dashboard build

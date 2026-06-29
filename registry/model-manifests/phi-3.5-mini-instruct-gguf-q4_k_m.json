@@ -1,0 +1,17 @@
+{
+  "schema": "sip-ai.model_manifest.v1",
+  "model_id": "phi-3.5-mini-instruct-gguf-q4_k_m",
+  "display_name": "Phi-3.5 Mini Instruct GGUF Q4_K_M",
+  "source_repo": "huggingface:bartowski/Phi-3.5-mini-instruct-GGUF",
+  "weights_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "format": "GGUF",
+  "quantization": "Q4_K_M",
+  "license": "mit",
+  "commercial_use": true,
+  "recommended_runtimes": ["llama.cpp", "ollama"],
+  "min_memory_gb": 4,
+  "recommended_memory_gb": 8,
+  "context_tested": [4096, 8192, 16384, 32768],
+  "tasks": ["general-chat", "reasoning", "coding", "long-context"],
+  "manifest_uri": "arweave://PLACEHOLDER_TX_ID"
+}

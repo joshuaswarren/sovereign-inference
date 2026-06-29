@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
 authors = [{ name = "Joshua Warren" }]
-dependencies = []
+dependencies = ["sin-node", "httpx>=0.27"]
 
 [build-system]
 requires = ["hatchling"]
@@ -14,3 +14,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/sip_runtime_llamacpp"]
+
+[tool.uv.sources]
+sin-node = { workspace = true }

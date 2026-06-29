@@ -17,6 +17,8 @@ dev = [
     "mypy>=1.10",
     "ruff>=0.6",
     "types-jsonschema",
+    "types-psutil",
+    "respx>=0.21",
 ]
 
 # ---- Ruff (lint + format + import sorting) ----

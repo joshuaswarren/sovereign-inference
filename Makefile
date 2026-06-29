@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := help
 
 PY_SRC := packages adapters
-MYPY_SRC := packages/sip-protocol/src packages/receipt-verifier/src
+MYPY_SRC := packages/sip-protocol/src packages/receipt-verifier/src packages/sin-node/src packages/sin-cli/src adapters/runtime-ollama/src adapters/runtime-llamacpp/src
 
 .PHONY: help
 help: ## Show this help

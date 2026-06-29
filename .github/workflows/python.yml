@@ -34,8 +34,8 @@ jobs:
       - name: Ruff lint
         run: uv run ruff check packages adapters
 
-      - name: mypy (core libraries)
-        run: uv run mypy packages/sip-protocol/src packages/receipt-verifier/src
+      - name: mypy (typed libraries)
+        run: uv run mypy packages/sip-protocol/src packages/receipt-verifier/src packages/sin-node/src packages/sin-cli/src adapters/runtime-ollama/src adapters/runtime-llamacpp/src
 
       - name: Tests
         run: uv run pytest --cov --cov-report=term-missing
@@ -51,3 +51,9 @@ jobs:
           else
             echo "OK: tampered receipt correctly rejected"
           fi
+
+      - name: SIN CLI smoke test (scan + recommend)
+        shell: bash
+        run: |
+          uv run sin scan --json | python -c "import json,sys; d=json.load(sys.stdin); assert 'accelerator' in d; print('scan ok:', d['accelerator'])"
+          uv run sin recommend --task coding --top 3 --json | python -c "import json,sys; r=json.load(sys.stdin); assert len(r) >= 1; print('recommend ok:', len(r), 'results')"
