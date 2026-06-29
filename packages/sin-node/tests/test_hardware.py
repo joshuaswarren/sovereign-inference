@@ -10,6 +10,7 @@ types — never exact hardware values.
 from __future__ import annotations
 
 from sin_node.hardware import (
+    _parse_cpu_model_name,
     detect_runtimes,
     parse_nvidia_smi,
     parse_rocm_smi,
@@ -103,6 +104,29 @@ def test_parse_rocm_smi_used_column_before_total() -> None:
     gpu = gpus[0]
     assert gpu.vram_total_gb is not None and 23.0 < gpu.vram_total_gb < 25.0
     assert gpu.vram_free_gb is not None and 22.0 < gpu.vram_free_gb < 24.0
+
+
+# --- CPU model parsing (/proc/cpuinfo on Linux) -----------------------------
+
+
+def test_parse_cpu_model_name_from_proc_cpuinfo() -> None:
+    sample = (
+        "processor\t: 0\n"
+        "vendor_id\t: AuthenticAMD\n"
+        "model name\t: AMD FX(tm)-8350 Eight-Core Processor\n"
+        "cpu MHz\t\t: 4000.000\n"
+    )
+    assert _parse_cpu_model_name(sample) == "AMD FX(tm)-8350 Eight-Core Processor"
+
+
+def test_parse_cpu_model_name_intel() -> None:
+    sample = "processor\t: 0\nmodel name\t: Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz\n"
+    assert _parse_cpu_model_name(sample) == "Intel(R) Core(TM) i7-9700K CPU @ 3.60GHz"
+
+
+def test_parse_cpu_model_name_missing_returns_none() -> None:
+    assert _parse_cpu_model_name("processor\t: 0\nflags\t: fpu vme\n") is None
+    assert _parse_cpu_model_name("") is None
 
 
 # --- runtime detection ------------------------------------------------------
