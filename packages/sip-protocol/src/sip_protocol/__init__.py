@@ -22,6 +22,7 @@ from .errors import (
 )
 from .hashing import hash_response_body, sha256_prefixed
 from .manifests import (
+    build_provider_manifest,
     model_manifest_hash,
     sign_provider_manifest,
     validate_model_manifest,
@@ -75,6 +76,7 @@ __all__ = [
     "VerificationResult",
     "VoucherVerification",
     "__version__",
+    "build_provider_manifest",
     "build_quote",
     "build_receipt",
     "build_voucher",

@@ -1,0 +1,20 @@
+[project]
+name = "sip-discovery"
+version = "0.1.2"
+description = "Provider discovery for SIP-AI: announce signed provider manifests to a directory (file or Arweave) and discover verified providers to route to."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [{ name = "Joshua Warren" }]
+dependencies = ["sip-protocol", "sip-arweave", "httpx>=0.27"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sip_discovery"]
+
+[tool.uv.sources]
+sip-protocol = { workspace = true }
+sip-arweave = { workspace = true }

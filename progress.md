@@ -3,6 +3,29 @@
 A running log of what's done and what's next. See [ROADMAP.md](ROADMAP.md) for
 the phased plan and [CHANGELOG.md](CHANGELOG.md) for released changes.
 
+## 2026-06-29 — Supply onboarding: `sin share` + provider discovery
+
+**Done** (branch `feat/sin-share-and-discovery`, PR pending)
+- **`sip-discovery`** (lead, TDD): `Directory` protocol + `FileDirectory` (atomic,
+  verify-on-announce/discover, dedupe-by-freshness, model filter) + `ArweaveDirectory`
+  (anchor + injected GraphQL query). Signature-verified discovery, freshest-per-key.
+- **`sip_protocol.build_provider_manifest`** (TDD): reusable unsigned provider-manifest
+  builder with `manifest_uri`.
+- **`sin share`** (TDD): `ShareConfig` + `build_share` compose the existing gateway
+  (caps + payment) over a SIN runtime adapter, advertise a signed `sovereign-node`
+  manifest with `manifest_uri`, and announce to a `Directory`. `cmd_share` + a
+  `--no-serve` publish/announce mode (also the CI smoke test).
+- **Discovery demo** (`sip-discovery-demo`): announce → discover → route → verify,
+  in-process and deterministic.
+- 452 tests pass; ruff + mypy --strict clean. CI extended (discovery in the mypy
+  list; discovery-demo + `sin share` publish smoke steps). Adversarial review run.
+
+**Why:** answers "can users' SIN nodes also join this system?" — yes: a SIN node is a
+first-class provider, and discovery removes the manual-registry cold-start.
+
+**Next:** open PR; then the bigger discovery follow-ons (a hosted directory service,
+reputation/health signals) and Phase 5 privacy modes.
+
 ## 2026-06-29 — Phase 4: decentralized integration (external compute + anchoring)
 
 **Done** (branch `feat/phase-4-decentralized`, PR pending)

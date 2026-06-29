@@ -7,6 +7,23 @@ follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 ## [Unreleased]
 
 ### Added
+- **Supply onboarding — `sin share` + provider discovery:**
+  - **`sin share`**: one command turns a running node into a discoverable SIP
+    provider — it fronts the local runtime adapter with the real provider gateway
+    (auth, model allowlist, context/token caps, rate limit, signed receipts, opt-in
+    PIC payment), advertises a signed `sovereign-node` manifest carrying the node's
+    public URL, and (optionally) announces it to a directory. `--no-serve` publishes
+    and announces without starting the server.
+  - **`sip-discovery`**: announce signed provider manifests to a `Directory` and
+    discover verified providers to route to — `FileDirectory` (offline shared JSON)
+    and `ArweaveDirectory` (anchor + injected GraphQL query). Discovery verifies
+    every manifest signature and keeps the freshest entry per provider key, so a
+    forged or stale entry is never routed to.
+  - **`sip_protocol.build_provider_manifest`**: a reusable unsigned provider-manifest
+    builder (sovereign-node / external-adapter / relay) with `manifest_uri` support.
+  - **Discovery demo** (`sip-discovery-demo`): a node announces itself, a router
+    discovers it, builds its registry, routes a real request, and verifies the
+    receipt — fully in-process and deterministic.
 - Repository bootstrap as a public, open-source monorepo.
 - Full product documentation set under `docs/` (vision, opportunity,
   architecture, PRDs for SIP-AI and SIN, protocol spec, manifests, transport

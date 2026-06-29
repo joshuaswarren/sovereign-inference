@@ -16,6 +16,7 @@ members = [
     "sin-node",
     "sip-arweave",
     "sip-compute",
+    "sip-discovery",
     "sip-pic",
     "sip-protocol",
     "sip-provider-akash",
@@ -1024,6 +1025,10 @@ source = { editable = "packages/sin-cli" }
 dependencies = [
     { name = "rich" },
     { name = "sin-node" },
+    { name = "sip-discovery" },
+    { name = "sip-pic" },
+    { name = "sip-protocol" },
+    { name = "sip-provider-gateway" },
     { name = "sip-receipts" },
     { name = "sip-runtime-llamacpp" },
     { name = "sip-runtime-ollama" },
@@ -1033,6 +1038,10 @@ dependencies = [
 requires-dist = [
     { name = "rich", specifier = ">=13.7" },
     { name = "sin-node", editable = "packages/sin-node" },
+    { name = "sip-discovery", editable = "packages/discovery" },
+    { name = "sip-pic", editable = "packages/pic-vouchers" },
+    { name = "sip-protocol", editable = "packages/sip-protocol" },
+    { name = "sip-provider-gateway", editable = "packages/provider-gateway" },
     { name = "sip-receipts", editable = "packages/receipt-verifier" },
     { name = "sip-runtime-llamacpp", editable = "adapters/runtime-llamacpp" },
     { name = "sip-runtime-ollama", editable = "adapters/runtime-ollama" },
@@ -1088,6 +1097,23 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "sip-protocol", editable = "packages/sip-protocol" }]
+
+[[package]]
+name = "sip-discovery"
+version = "0.1.2"
+source = { editable = "packages/discovery" }
+dependencies = [
+    { name = "httpx" },
+    { name = "sip-arweave" },
+    { name = "sip-protocol" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "sip-arweave", editable = "packages/arweave-anchor" },
+    { name = "sip-protocol", editable = "packages/sip-protocol" },
+]
 
 [[package]]
 name = "sip-pic"
@@ -1211,6 +1237,7 @@ dependencies = [
     { name = "sin-node" },
     { name = "sip-arweave" },
     { name = "sip-compute" },
+    { name = "sip-discovery" },
     { name = "sip-pic" },
     { name = "sip-protocol" },
     { name = "sip-provider-akash" },
@@ -1225,6 +1252,7 @@ requires-dist = [
     { name = "sin-node", editable = "packages/sin-node" },
     { name = "sip-arweave", editable = "packages/arweave-anchor" },
     { name = "sip-compute", editable = "packages/compute" },
+    { name = "sip-discovery", editable = "packages/discovery" },
     { name = "sip-pic", editable = "packages/pic-vouchers" },
     { name = "sip-protocol", editable = "packages/sip-protocol" },
     { name = "sip-provider-akash", editable = "adapters/provider-akash" },

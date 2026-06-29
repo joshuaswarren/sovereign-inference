@@ -11,6 +11,10 @@ dependencies = [
     "sip-runtime-ollama",
     "sip-runtime-llamacpp",
     "sip-receipts",
+    "sip-protocol",
+    "sip-provider-gateway",
+    "sip-pic",
+    "sip-discovery",
     "rich>=13.7",
 ]
 
@@ -29,3 +33,7 @@ sin-node = { workspace = true }
 sip-runtime-ollama = { workspace = true }
 sip-runtime-llamacpp = { workspace = true }
 sip-receipts = { workspace = true }
+sip-protocol = { workspace = true }
+sip-provider-gateway = { workspace = true }
+sip-pic = { workspace = true }
+sip-discovery = { workspace = true }
