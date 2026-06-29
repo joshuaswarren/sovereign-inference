@@ -50,12 +50,22 @@ from .signing import (
     encode_public_key,
     verify,
 )
+from .vouchers import (
+    VOUCHER_VERSION,
+    VoucherVerification,
+    build_voucher,
+    new_voucher_id,
+    sign_voucher,
+    verify_voucher,
+    voucher_is_expired,
+)
 
 __version__ = "0.1.2"
 
 __all__ = [
     "QUOTE_VERSION",
     "RECEIPT_VERSION",
+    "VOUCHER_VERSION",
     "KeyEncodingError",
     "KeyPair",
     "QuoteVerification",
@@ -63,9 +73,11 @@ __all__ = [
     "SchemaValidationError",
     "SignatureError",
     "VerificationResult",
+    "VoucherVerification",
     "__version__",
     "build_quote",
     "build_receipt",
+    "build_voucher",
     "canonical_json",
     "decode_public_key",
     "encode_public_key",
@@ -73,6 +85,7 @@ __all__ = [
     "iter_errors",
     "load_schema",
     "model_manifest_hash",
+    "new_voucher_id",
     "quote_is_expired",
     "receipt_signing_bytes",
     "sha256_prefixed",
@@ -80,6 +93,7 @@ __all__ = [
     "sign_provider_manifest",
     "sign_quote",
     "sign_receipt",
+    "sign_voucher",
     "signing_bytes",
     "validate",
     "validate_model_manifest",
@@ -88,4 +102,6 @@ __all__ = [
     "verify_provider_manifest",
     "verify_quote",
     "verify_receipt",
+    "verify_voucher",
+    "voucher_is_expired",
 ]

@@ -63,5 +63,22 @@ follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   - Adversarial review pass: 8 confirmed findings fixed with regression tests
     (including failover on non-JSON bodies, receipt/response-hash binding, and
     signed-quote price enforcement).
+- **Phase 3 — payments (Private Inference Credits + x402):**
+  - Signed **Voucher** artifact (`sip-ai.voucher.v1`) — an issuer-signed bearer
+    credit (build/sign/verify + expiry + JSON schema).
+  - **`sip-pic`**: a PIC issuer, a wallet, a persistent **double-spend `SpentSet`**
+    (atomic redemption with rollback), `redeem_payment` (all-or-nothing PIC batch
+    + x402), a provider `Ledger`, and the HTTP 402 challenge — all `Decimal` money math.
+  - **x402** direct-pay: payer-signed, single-use (nonce), and bound to one
+    provider + request, with a documented path to real on-chain settlement.
+  - **Gateway** payment enforcement: an HTTP 402 challenge carrying the exact
+    price, **charge-on-success** (the credit is consumed only after a successful
+    response), and a receipt that attests the price actually charged.
+  - **Router** reactive payment: on 402 it pays from a wallet (or x402), retries
+    the provider once, returns unspent vouchers to the wallet on failure, and fails over.
+  - **Paid end-to-end demo**: mint → 402 → pay → verified receipt → wallet
+    debited / provider ledger credited → double-spend replay rejected.
+  - Adversarial review pass: 4 confirmed money bugs fixed with regression tests
+    (x402 replay, charge-on-success, receipt==charged, paid-retry voucher safety).
 
 [Unreleased]: https://github.com/joshuaswarren/sovereign-inference/commits/main

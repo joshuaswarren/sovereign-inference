@@ -8,6 +8,7 @@ license = "AGPL-3.0-or-later"
 authors = [{ name = "Joshua Warren" }]
 dependencies = [
     "sip-protocol",
+    "sip-pic",
     "sin-node",
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
@@ -23,4 +24,5 @@ packages = ["src/sip_gateway"]
 
 [tool.uv.sources]
 sip-protocol = { workspace = true }
+sip-pic = { workspace = true }
 sin-node = { workspace = true }

@@ -3,6 +3,26 @@
 A running log of what's done and what's next. See [ROADMAP.md](ROADMAP.md) for
 the phased plan and [CHANGELOG.md](CHANGELOG.md) for released changes.
 
+## 2026-06-29 — Phase 3: payments (PIC + x402)
+
+**Done** (branch `feat/phase-3-payment`, PR pending)
+- Signed **Voucher** artifact (`sip-ai.voucher.v1`) in `sip-protocol` (TDD).
+- **`sip-pic`**: Issuer, Wallet, persistent atomic double-spend `SpentSet`,
+  `redeem_payment` (all-or-nothing PIC + single-use/bound x402), provider `Ledger`,
+  402 challenge — all `Decimal` math.
+- **Gateway**: HTTP 402 challenge + **charge-on-success** (verify → serve → commit);
+  receipt attests the charged price. **Router**: reactive 402 pay-and-retry with
+  voucher refund on failure → failover.
+- **Paid demo** green: mint → 402 → pay → verified receipt → debited/credited →
+  double-spend replay rejected.
+- Built via an implementation workflow + adversarial-review workflow; 4 confirmed
+  money bugs fixed (x402 replay, charge-on-success, receipt==charged, paid-retry
+  voucher safety) with regression tests. Full suite + ruff + mypy --strict clean.
+
+**Next (Phase 4 — decentralized integration)**
+- Arweave manifest/receipt anchoring; a Nosana (or Akash) external compute/provider
+  adapter; published reproducible demo metrics (issue #10).
+
 ## 2026-06-29 — Phase 2: SIP-AI network routing
 
 **Done** (branch `feat/phase-2-network-routing`, PR pending)

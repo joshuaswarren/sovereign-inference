@@ -8,6 +8,7 @@ license = "AGPL-3.0-or-later"
 authors = [{ name = "Joshua Warren" }]
 dependencies = [
     "sip-protocol",
+    "sip-pic",
     "httpx>=0.27",
     "pydantic>=2.6",
 ]
@@ -21,3 +22,4 @@ packages = ["src/sip_router"]
 
 [tool.uv.sources]
 sip-protocol = { workspace = true }
+sip-pic = { workspace = true }
