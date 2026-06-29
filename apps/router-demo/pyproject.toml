@@ -12,11 +12,16 @@ dependencies = [
     "sip-pic",
     "sin-node",
     "sip-protocol",
+    "sip-compute",
+    "sip-arweave",
+    "sip-provider-nosana",
+    "sip-provider-akash",
     "httpx>=0.27",
 ]
 
 [project.scripts]
 sip-router-demo = "sip_router_demo.demo:main"
+sip-decentralized-demo = "sip_router_demo.decentralized_demo:run"
 
 [build-system]
 requires = ["hatchling"]
@@ -31,3 +36,7 @@ sip-provider-gateway = { workspace = true }
 sip-pic = { workspace = true }
 sin-node = { workspace = true }
 sip-protocol = { workspace = true }
+sip-compute = { workspace = true }
+sip-arweave = { workspace = true }
+sip-provider-nosana = { workspace = true }
+sip-provider-akash = { workspace = true }
