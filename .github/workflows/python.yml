@@ -35,7 +35,7 @@ jobs:
         run: uv run ruff check packages adapters apps
 
       - name: mypy (typed libraries)
-        run: uv run mypy packages/sip-protocol/src packages/receipt-verifier/src packages/sin-node/src packages/sin-cli/src packages/compute/src packages/arweave-anchor/src adapters/runtime-ollama/src adapters/runtime-llamacpp/src adapters/provider-nosana/src adapters/provider-akash/src apps/router-demo/src
+        run: uv run mypy packages/sip-protocol/src packages/receipt-verifier/src packages/sin-node/src packages/sin-cli/src packages/compute/src packages/arweave-anchor/src packages/discovery/src adapters/runtime-ollama/src adapters/runtime-llamacpp/src adapters/provider-nosana/src adapters/provider-akash/src apps/router-demo/src
 
       - name: Tests
         run: uv run pytest --cov --cov-report=term-missing
@@ -60,3 +60,14 @@ jobs:
 
       - name: Decentralized demo smoke test (provision → anchor → route → verify)
         run: uv run sip-decentralized-demo
+
+      - name: Discovery demo smoke test (announce → discover → route → verify)
+        run: uv run sip-discovery-demo
+
+      - name: Share publish smoke test (sin share --no-serve → discoverable manifest)
+        shell: bash
+        run: |
+          uv run sin share --runtime ollama --model qwen-coder-7b \
+            --advertised-url http://ci-node:8090 --no-serve \
+            --manifest-out manifest.json --directory providers.json
+          python -c "import json,sys; m=json.load(open('manifest.json')); assert m['node_type']=='sovereign-node'; assert m['manifest_uri']=='http://ci-node:8090'; print('share manifest ok')"

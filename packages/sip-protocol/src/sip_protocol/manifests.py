@@ -20,6 +20,60 @@ from .signing import KeyPair
 MODEL_MANIFEST_SCHEMA = "sip-ai.model_manifest.v1"
 PROVIDER_MANIFEST_SCHEMA = "sip-ai.provider_manifest.v1"
 
+_DEFAULT_PRIVACY_MODES = ["direct"]
+
+
+def build_provider_manifest(
+    *,
+    provider_pubkey: str,
+    models: list[str],
+    runtime_adapters: list[str],
+    pricing_unit: str,
+    published_at: str,
+    input_per_1m: float = 0.0,
+    output_per_1m: float = 0.0,
+    node_type: str = "sovereign-node",
+    max_context: int = 4096,
+    max_concurrency: int | None = None,
+    logging_policy: str = "no_prompt_logging",
+    retention_policy: str | None = None,
+    privacy_modes: list[str] | None = None,
+    benchmark: dict[str, Any] | None = None,
+    manifest_uri: str | None = None,
+) -> dict[str, Any]:
+    """Assemble an unsigned ``sip-ai.provider_manifest.v1`` dict.
+
+    A reusable builder for any provider — a local Sovereign Inference Node
+    (``sovereign-node``), an external-compute adapter, a relay. Optional fields
+    are omitted entirely when not given so the manifest stays minimal. Pass the
+    result to :func:`sign_provider_manifest` to sign it.
+    """
+    manifest: dict[str, Any] = {
+        "schema": PROVIDER_MANIFEST_SCHEMA,
+        "provider_pubkey": provider_pubkey,
+        "node_type": node_type,
+        "models": list(models),
+        "runtime_adapters": list(runtime_adapters),
+        "pricing": {
+            "unit": pricing_unit,
+            "input_per_1m": input_per_1m,
+            "output_per_1m": output_per_1m,
+        },
+        "max_context": max_context,
+        "logging_policy": logging_policy,
+        "privacy_modes": list(privacy_modes) if privacy_modes is not None else list(_DEFAULT_PRIVACY_MODES),
+        "published_at": published_at,
+    }
+    if max_concurrency is not None:
+        manifest["max_concurrency"] = max_concurrency
+    if retention_policy is not None:
+        manifest["retention_policy"] = retention_policy
+    if benchmark is not None:
+        manifest["benchmark"] = dict(benchmark)
+    if manifest_uri is not None:
+        manifest["manifest_uri"] = manifest_uri
+    return manifest
+
 
 def model_manifest_hash(manifest: dict[str, Any]) -> str:
     """Content-address a model manifest as ``sha256:<hex>`` of its canonical form.

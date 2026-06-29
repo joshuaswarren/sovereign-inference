@@ -149,6 +149,66 @@ def cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+# --------------------------------------------------------------------- share
+
+
+def cmd_share(args: argparse.Namespace) -> int:
+    from sip_discovery import FileDirectory
+    from sip_gateway import serve
+    from sip_protocol import KeyPair
+
+    from .share import ShareConfig, announce_to_directory, build_share
+
+    try:
+        adapter = get_adapter(args.runtime)
+    except Exception as exc:  # surface any adapter resolution failure as exit 1
+        _err.print(f"[red]unknown runtime:[/red] {exc}")
+        return 1
+
+    if args.key_file:
+        try:
+            keypair = _load_keypair(args.key_file)
+        except (OSError, ValueError) as exc:
+            _err.print(f"[red]key load failed:[/red] {exc}")
+            return 1
+    else:
+        keypair = KeyPair.generate()
+        _err.print("[yellow]no --key-file: generated an ephemeral identity (it changes on restart).[/yellow]")
+
+    config = ShareConfig(
+        model=args.model,
+        runtime=args.runtime,
+        host=args.host,
+        port=args.port,
+        advertised_url=args.advertised_url,
+        token=args.token,
+        max_output_tokens=args.max_output_tokens,
+        rate_limit_per_minute=args.rate_limit,
+        pricing_unit=args.unit,
+        input_per_1m=args.input_per_1m,
+        output_per_1m=args.output_per_1m,
+        require_payment=args.require_payment,
+        pic_issuers=tuple(args.pic_issuer or ()),
+    )
+    result = build_share(config, keypair=keypair, adapter=adapter)
+
+    if args.manifest_out:
+        Path(args.manifest_out).write_text(json.dumps(result.manifest, indent=2), encoding="utf-8")
+    if args.directory:
+        announce_to_directory(FileDirectory(args.directory), result)
+
+    _out.print(f"provider:   {keypair.public_key_str}")
+    _out.print(f"serving:    {args.model} via {args.runtime}")
+    _out.print(f"advertised: {result.base_url}")
+    if args.directory:
+        _out.print(f"announced:  {args.directory}")
+    if args.no_serve:
+        return 0
+    _out.print(f"listening on http://{args.host}:{args.port}  (Ctrl-C to stop)")
+    serve(result.app, host=args.host, port=args.port)  # pragma: no cover - blocks on the event loop
+    return 0
+
+
 # ------------------------------------------------------------------- install
 
 
@@ -266,6 +326,26 @@ def build_parser() -> argparse.ArgumentParser:
     p_serve.add_argument("--port", type=int, default=8080, help="port to bind the server (default 8080)")
     p_serve.add_argument("--ctx", type=int, default=4096, help="context window size (default 4096)")
     p_serve.set_defaults(func=cmd_serve)
+
+    p_share = sub.add_parser("share", help="expose this node's model as a discoverable, signed SIP provider")
+    p_share.add_argument("--runtime", default="ollama", choices=("ollama", "llama.cpp"), help="runtime adapter")
+    p_share.add_argument("--model", required=True, help="model alias to serve and advertise")
+    p_share.add_argument("--host", default="127.0.0.1", help="bind host (default 127.0.0.1)")
+    p_share.add_argument("--port", type=int, default=8090, help="bind port (default 8090)")
+    p_share.add_argument("--advertised-url", help="public URL to announce (default http://HOST:PORT)")
+    p_share.add_argument("--token", help="bearer token required of callers (default: open)")
+    p_share.add_argument("--max-output-tokens", type=_positive_int, default=512, help="cap output tokens per request")
+    p_share.add_argument("--rate-limit", type=int, default=60, help="max requests/minute (default 60)")
+    p_share.add_argument("--unit", default="usdc", help="pricing unit advertised (default usdc)")
+    p_share.add_argument("--input-per-1m", type=float, default=0.0, help="price per 1M input tokens")
+    p_share.add_argument("--output-per-1m", type=float, default=0.0, help="price per 1M output tokens")
+    p_share.add_argument("--require-payment", action="store_true", help="require PIC payment for completions")
+    p_share.add_argument("--pic-issuer", action="append", help="accepted PIC issuer pubkey (repeatable)")
+    p_share.add_argument("--key-file", help="sip-receipt keygen JSON for a stable provider identity")
+    p_share.add_argument("--manifest-out", help="write the signed provider manifest to this path")
+    p_share.add_argument("--directory", help="announce the manifest to this directory file")
+    p_share.add_argument("--no-serve", action="store_true", help="publish/announce only; do not start the server")
+    p_share.set_defaults(func=cmd_share)
 
     p_install = sub.add_parser("install", help="fetch a model via a runtime's pull command")
     p_install.add_argument("--runtime", required=True, choices=("ollama",), help="runtime to pull with")

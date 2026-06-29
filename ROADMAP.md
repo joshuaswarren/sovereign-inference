@@ -46,6 +46,17 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 > [article series](docs/hackathon/article-series.md) and the
 > [evidence plan](docs/hackathon/evidence-plan.md).
 
+## Supply onboarding — `sin share` + discovery — ✅ landed
+- ✅ `sin share`: one command exposes a node's model as a discoverable, signed SIP
+  provider (gateway caps + opt-in payment + signed `sovereign-node` manifest);
+  `--no-serve` publishes/announces only
+- ✅ `sip-discovery`: announce signed manifests to a `Directory` and discover
+  verified providers — `FileDirectory` (offline shared JSON) + `ArweaveDirectory`
+  (anchor + GraphQL query); signature-verified, freshest-per-key
+- ✅ `sip-discovery-demo`: announce → discover → route → verify, in-process
+- ⬜ Follow-ons: a hosted/relayed directory service, provider reputation + health
+  signals, automatic re-announce on benchmark refresh
+
 ## Phase 5 — Privacy modes  (post-MVP)
 - ⬜ Relay hardening; Tor/Snowflake, I2P, and Nym-compatible transport experiments
 - ⬜ TEE-capable provider metadata & attestation

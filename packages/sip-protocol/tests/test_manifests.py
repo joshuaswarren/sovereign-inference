@@ -6,6 +6,7 @@ from sip_protocol import (
     validate_model_manifest,
     verify_provider_manifest,
 )
+from sip_protocol.manifests import build_provider_manifest
 
 
 def _model_manifest() -> dict:
@@ -67,3 +68,49 @@ def test_provider_manifest_tamper_detected() -> None:
     signed = sign_provider_manifest(_provider_manifest(kp.public_key_str), kp)
     signed["pricing"]["output_per_1m"] = 0.01
     assert verify_provider_manifest(signed) is False
+
+
+def test_build_provider_manifest_defaults_then_signs_and_verifies() -> None:
+    kp = KeyPair.generate()
+    manifest = build_provider_manifest(
+        provider_pubkey=kp.public_key_str,
+        models=["qwen-coder-7b"],
+        runtime_adapters=["ollama"],
+        pricing_unit="usdc",
+        published_at="2026-06-29T00:00:00Z",
+    )
+    assert manifest["node_type"] == "sovereign-node"
+    assert manifest["privacy_modes"] == ["direct"]
+    assert manifest["logging_policy"] == "no_prompt_logging"
+    assert manifest["pricing"] == {"unit": "usdc", "input_per_1m": 0.0, "output_per_1m": 0.0}
+    assert "manifest_uri" not in manifest
+    assert "max_concurrency" not in manifest
+    assert verify_provider_manifest(sign_provider_manifest(manifest, kp)) is True
+
+
+def test_build_provider_manifest_includes_optional_fields() -> None:
+    kp = KeyPair.generate()
+    manifest = build_provider_manifest(
+        provider_pubkey=kp.public_key_str,
+        models=["m"],
+        runtime_adapters=["llama.cpp"],
+        pricing_unit="pic",
+        input_per_1m=0.2,
+        output_per_1m=0.8,
+        node_type="external-adapter",
+        max_context=8192,
+        max_concurrency=4,
+        logging_policy="metadata_only",
+        retention_policy="metrics_only_30d",
+        privacy_modes=["direct", "private-payment"],
+        benchmark={"tokens_per_second": 40.0, "ttft_ms": 500},
+        manifest_uri="https://node.example/sip",
+        published_at="2026-06-29T00:00:00Z",
+    )
+    assert manifest["node_type"] == "external-adapter"
+    assert manifest["manifest_uri"] == "https://node.example/sip"
+    assert manifest["max_concurrency"] == 4
+    assert manifest["retention_policy"] == "metrics_only_30d"
+    assert manifest["benchmark"] == {"tokens_per_second": 40.0, "ttft_ms": 500}
+    assert manifest["privacy_modes"] == ["direct", "private-payment"]
+    assert verify_provider_manifest(sign_provider_manifest(manifest, kp)) is True
