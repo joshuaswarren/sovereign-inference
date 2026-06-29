@@ -52,7 +52,8 @@ This is a real, in-progress build, not a slideware concept. Honest snapshot:
 | JSON Schemas for receipts & manifests | ✅ **authoritative, CI-validated** |
 | **SIN node** — `sin scan`, recommendation engine, benchmark · `sin` CLI · Ollama & llama.cpp adapters · status API · React dashboard | ✅ **implemented + tested** (Phase 1) |
 | **SIP-AI routing** — provider gateway (auth, limits, signed receipts) · router (resolve, score, quote, route, **failover**) · signed quotes | ✅ **implemented + tested** (Phase 2) |
-| PIC vouchers · external compute adapters (Nosana/Akash) · Arweave anchoring | 🚧 scaffolded — see [ROADMAP](ROADMAP.md) (Phase 3–4) |
+| **Payments** — Private Inference Credits (issue/redeem/settle, double-spend-safe) · x402 direct-pay · provider accounting · HTTP 402 flow | ✅ **implemented + tested** (Phase 3) |
+| External compute adapters (Nosana/Akash) · Arweave anchoring | 🚧 scaffolded — see [ROADMAP](ROADMAP.md) (Phase 4) |
 
 ## Try the working slice (60 seconds)
 

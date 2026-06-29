@@ -26,10 +26,10 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ Provider gateway: auth, model allowlist, context/token caps, rate limit, signed receipt generation
 - ✅ Signed receipts + quotes end-to-end through a real request (router ↔ two gateways, with failover)
 
-## Phase 3 — Payment  (Weeks 4–5)
-- ⬜ x402 direct-payment path (first real form, with upgrade path)
-- ⬜ PIC: issue → redeem → settle, with double-spend prevention
-- ⬜ Provider accounting & balances
+## Phase 3 — Payment  (Weeks 4–5) — ✅ complete
+- ✅ x402 direct-payment path (signed, single-use, provider/request-bound; documented on-chain upgrade)
+- ✅ PIC: issue → redeem → settle, with atomic double-spend prevention (and signed voucher artifact)
+- ✅ Provider accounting & balances (Ledger); HTTP 402 challenge wired into gateway + router (charge-on-success)
 
 ## Phase 4 — Decentralized integration  (Weeks 5–6)
 - ⬜ Arweave manifest anchoring (model + provider manifests, public receipts)
