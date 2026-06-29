@@ -44,5 +44,24 @@ follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   - A FastAPI status API and a React/Vite dashboard.
   - Adversarial review pass: 7 confirmed findings fixed with regression tests
     (182 tests total; ruff + mypy --strict clean across the typed packages).
+- **Phase 2 — SIP-AI network routing:**
+  - Signed inference **quotes** (`sip-ai.quote.v1`) — a provider's verifiable,
+    expiring price commitment (build/sign/verify + JSON schema).
+  - **Provider gateway** (`sip-provider-gateway`): a hardened FastAPI front door
+    over a runtime adapter — bearer auth (constant-time), model allowlist,
+    context/output-token caps, in-memory rate limit, and logging policy;
+    `/sip/v1` health/quote/provider-manifest plus an OpenAI-compatible
+    `/v1/chat/completions` that returns a provider-signed receipt.
+  - **Router** (`sip-router`): a provider registry + resolver, weighted provider
+    scoring (spec §6.8), and `SovereignClient`, which resolves → scores →
+    (optionally quotes) → routes one request to one provider → verifies the
+    signed receipt (signature, provider-key binding, and response-body hash) →
+    **fails over** to the next provider on any failure.
+  - **End-to-end demo** (`sip-router-demo`): the real client routes across two
+    real in-process gateways, verifies receipts, and fails over when a provider
+    goes down.
+  - Adversarial review pass: 8 confirmed findings fixed with regression tests
+    (including failover on non-JSON bodies, receipt/response-hash binding, and
+    signed-quote price enforcement).
 
 [Unreleased]: https://github.com/joshuaswarren/sovereign-inference/commits/main

@@ -20,11 +20,11 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ `sin benchmark` — tokens/sec, TTFT, max stable context; emits a signed provider manifest
 - ✅ Local web dashboard (React/Vite) + FastAPI status API
 
-## Phase 2 — Network routing  (Weeks 3–4)
-- ⬜ Provider registry (local JSON) + resolver
-- ⬜ Router: scoring, quotes, one-provider-per-request, **failover**
-- ⬜ Provider gateway: auth, quotas, policy, request limits, receipt generation
-- ⬜ Signed receipts end-to-end through a real request
+## Phase 2 — Network routing  (Weeks 3–4) — ✅ complete
+- ✅ Provider registry (local JSON) + resolver
+- ✅ Router: weighted scoring (§6.8), signed quotes, one-provider-per-request, **failover**
+- ✅ Provider gateway: auth, model allowlist, context/token caps, rate limit, signed receipt generation
+- ✅ Signed receipts + quotes end-to-end through a real request (router ↔ two gateways, with failover)
 
 ## Phase 3 — Payment  (Weeks 4–5)
 - ⬜ x402 direct-payment path (first real form, with upgrade path)
