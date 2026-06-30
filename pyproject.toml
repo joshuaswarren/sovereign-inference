@@ -13,6 +13,7 @@ members = [
     "apps/router-demo",
     "apps/directory-service",
     "apps/relay",
+    "apps/openai-proxy",
 ]
 
 [dependency-groups]
@@ -38,7 +39,7 @@ select = ["E", "F", "I", "UP", "B", "C4", "SIM", "PTH", "RUF"]
 ignore = ["E501"]  # line length handled by formatter
 
 [tool.ruff.lint.isort]
-known-first-party = ["sip_protocol", "sip_receipts", "sip_pic", "sip_gateway", "sip_router", "sip_router_demo", "sip_compute", "sip_arweave", "sip_discovery", "sip_reputation", "sip_directory_service", "sip_relay", "sip_provider_nosana", "sip_provider_akash", "sin_node", "sin_cli"]
+known-first-party = ["sip_protocol", "sip_receipts", "sip_pic", "sip_gateway", "sip_router", "sip_router_demo", "sip_compute", "sip_arweave", "sip_discovery", "sip_reputation", "sip_directory_service", "sip_relay", "sip_policy", "sip_openai_proxy", "sip_provider_nosana", "sip_provider_akash", "sin_node", "sin_cli"]
 
 # ---- mypy (strict typing per project standards) ----
 [tool.mypy]
@@ -64,7 +65,7 @@ addopts = "-ra -q --import-mode=importlib"
 
 [tool.coverage.run]
 branch = true
-source = ["sip_protocol", "sip_receipts", "sip_pic", "sip_gateway", "sip_router", "sip_router_demo", "sip_compute", "sip_arweave", "sip_discovery", "sip_reputation", "sip_directory_service", "sip_relay", "sip_provider_nosana", "sip_provider_akash", "sin_node", "sin_cli"]
+source = ["sip_protocol", "sip_receipts", "sip_pic", "sip_gateway", "sip_router", "sip_router_demo", "sip_compute", "sip_arweave", "sip_discovery", "sip_reputation", "sip_directory_service", "sip_relay", "sip_policy", "sip_openai_proxy", "sip_provider_nosana", "sip_provider_akash", "sin_node", "sin_cli"]
 
 [tool.coverage.report]
 show_missing = true

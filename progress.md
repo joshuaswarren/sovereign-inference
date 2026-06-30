@@ -3,6 +3,23 @@
 A running log of what's done and what's next. See [ROADMAP.md](ROADMAP.md) for
 the phased plan and [CHANGELOG.md](CHANGELOG.md) for released changes.
 
+## 2026-06-30 — Phase 6 (part 1): local OpenAI-compatible endpoint + policy
+
+**Done** (branch `feat/phase-6-openai-proxy`, PR pending)
+- **`sip-openai-proxy`** (AGPL, TDD): one local server exposing `/v1/models` +
+  `/v1/chat/completions` (streaming SSE + non-streaming) + `/healthz` over the real
+  `SovereignClient` — point any OpenAI client at `http://localhost:11435/v1`. Every
+  answer carries a verified signed receipt under a `sip` extension; optional API key.
+  Verified on a real socket (boots, serves OpenAI-shaped `/v1/models`).
+- **`sip-policy`** (Apache, TDD): `Policy` (require attestation/tee-types, price caps +
+  units, required privacy modes, allow/deny, min reputation via injected score);
+  `build_backend` filters the registry + model list by policy.
+- 510 tests; ruff + mypy --strict clean (80 files). CI extended (policy + proxy in
+  the mypy list). Adversarial review running.
+
+**Next (Phase 6 part 2):** plugin SDK (entry-point extension points), security
+hardening (pip-audit CI, SBOM, signed-releases doc), Tauri desktop scaffold.
+
 ## 2026-06-30 — Phase 5: privacy modes + 3-machine validation
 
 **Live validation** — all of `main` (Phases 0–4 + share/discovery + supply) re-run

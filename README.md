@@ -89,6 +89,26 @@ uv run sin status                        # registered runtime adapters
 explains *why* each model fits and what tradeoffs it carries. See the
 [SIN PRD](docs/prd/sin.md) and [ROADMAP](ROADMAP.md).
 
+### Use the network like a local LLM (OpenAI-compatible)
+
+Run one server and point any OpenAI client at it — the request routes across the
+network with failover and returns a verified signed receipt:
+
+```console
+uv run sip-openai-proxy --registry ~/.sin/providers.json --port 11435
+```
+
+```python
+from openai import OpenAI
+client = OpenAI(base_url="http://localhost:11435/v1", api_key="sk-local")
+client.chat.completions.create(model="qwen-coder-7b",
+                               messages=[{"role": "user", "content": "hi"}])
+```
+
+Works with the `openai` SDK, LangChain, LM Studio, a chat UI, or `curl`. A
+[`Policy`](packages/policy) (attestation, price caps, privacy modes, allow/deny,
+reputation) gates which providers may serve. See [`sip-openai-proxy`](apps/openai-proxy).
+
 ## Repository layout
 
 ```text

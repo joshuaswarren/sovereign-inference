@@ -72,12 +72,18 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ⬜ Further: multi-hop onion routing + Tor/Snowflake/I2P/Nym transports, request
   encryption, formal review of the blind-credit scheme, DCAP/SEV quote verifiers.
 
-## Phase 6 — Production hardening  (post-hackathon)
-- ⬜ Security review & signed releases
-- ⬜ Plugin SDK, policy framework, provider reputation
+## Phase 6 — Production hardening  (post-hackathon) — 🚧 in progress
+- ✅ **Local OpenAI-compatible endpoint** (`sip-openai-proxy`): use the network like
+  a local LLM — point any OpenAI client at `http://localhost:11435/v1`; routing +
+  failover + verified receipts under the hood.
+- ✅ **Policy framework** (`sip-policy`): attestation / price caps / privacy modes /
+  allow-deny / min-reputation, applied by the proxy.
+- ✅ Provider reputation (`sip-reputation`, shipped in supply onboarding).
+- ⬜ Plugin SDK (entry-point extension points for adapters / providers / directories).
+- ⬜ Security review & signed releases (dependency audit, SBOM, signed artifacts).
 - ⬜ **Cross-platform desktop app (Tauri)** bundling the Python node as a sidecar
   + the React dashboard, for one-click install on macOS/Linux/Windows by
-  non-technical users
+  non-technical users.
 
 ## How to help
 Pick an unchecked item, open an issue if one doesn't exist, and see
