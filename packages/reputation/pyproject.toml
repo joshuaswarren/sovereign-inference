@@ -1,0 +1,20 @@
+[project]
+name = "sip-reputation"
+version = "0.1.2"
+description = "Provider health probing and reputation scoring for SIP-AI: rank discovered providers by liveness, success rate, latency, and receipt validity."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [{ name = "Joshua Warren" }]
+dependencies = ["sip-protocol", "sip-discovery", "httpx>=0.27"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sip_reputation"]
+
+[tool.uv.sources]
+sip-protocol = { workspace = true }
+sip-discovery = { workspace = true }

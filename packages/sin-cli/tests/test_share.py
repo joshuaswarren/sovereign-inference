@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -12,7 +13,7 @@ from fastapi.testclient import TestClient
 import sip_pic
 import sip_protocol
 from sin_cli.cli import main
-from sin_cli.share import ShareConfig, announce_to_directory, build_share
+from sin_cli.share import ShareConfig, announce_to_directory, build_share, reannounce
 from sip_discovery import FileDirectory
 from sip_gateway import MockAdapter
 from sip_protocol import KeyPair
@@ -158,3 +159,124 @@ def test_cli_share_no_serve_publishes_and_announces() -> None:
         found = FileDirectory(directory_path).discover(model=MODEL)
         assert len(found) == 1
         assert found[0].base_url == "http://shared-node:8090"
+
+
+# -- benchmark embedding + re-announce ------------------------------------------
+
+
+def test_build_share_embeds_benchmark_when_configured() -> None:
+    kp = KeyPair.generate()
+    result = build_share(
+        _config(benchmark={"tokens_per_second": 33.0, "ttft_ms": 600}), keypair=kp, adapter=MockAdapter()
+    )
+    assert result.manifest["benchmark"]["tokens_per_second"] == 33.0
+    assert sip_protocol.verify_provider_manifest(result.manifest)
+
+
+def test_reannounce_publishes_fresh_manifest_with_benchmark() -> None:
+    kp = KeyPair.generate()
+    config = _config(benchmark={"tokens_per_second": 42.0, "ttft_ms": 480})
+    with tempfile.TemporaryDirectory() as d:
+        directory = FileDirectory(Path(d) / "providers.json")
+        reannounce(directory, config, keypair=kp, runtime_name="ollama")
+        found = directory.discover(model=MODEL)
+        assert len(found) == 1
+        assert found[0].manifest["benchmark"]["tokens_per_second"] == 42.0
+        assert found[0].provider_pubkey == kp.public_key_str
+        assert found[0].manifest["runtime_adapters"] == ["ollama"]
+
+
+def test_reannounce_supersedes_older_announcement() -> None:
+    kp = KeyPair.generate()
+    older = lambda: datetime(2026, 6, 29, tzinfo=UTC)  # noqa: E731
+    newer = lambda: datetime(2026, 6, 30, tzinfo=UTC)  # noqa: E731
+    with tempfile.TemporaryDirectory() as d:
+        directory = FileDirectory(Path(d) / "providers.json")
+        reannounce(
+            directory,
+            _config(benchmark={"tokens_per_second": 10.0, "ttft_ms": 900}),
+            keypair=kp,
+            runtime_name="ollama",
+            now=older,
+        )
+        reannounce(
+            directory,
+            _config(benchmark={"tokens_per_second": 55.0, "ttft_ms": 300}),
+            keypair=kp,
+            runtime_name="ollama",
+            now=newer,
+        )
+        found = directory.discover()
+        assert len(found) == 1  # freshest-per-pubkey wins
+        assert found[0].manifest["benchmark"]["tokens_per_second"] == 55.0
+
+
+def test_cli_benchmark_announce_updates_directory(monkeypatch: object) -> None:
+    from sin_node.models import BenchmarkResult
+
+    fake = BenchmarkResult(model_alias=MODEL, runtime="ollama", ttft_ms=300.0, tokens_per_second=48.5)
+
+    def fake_benchmark(base_url: str, model: str, *, runtime: str) -> BenchmarkResult:
+        return fake
+
+    import sin_cli.cli as cli
+
+    monkeypatch.setattr(cli, "benchmark_endpoint", fake_benchmark)  # type: ignore[attr-defined]
+
+    kp = KeyPair.generate()
+    with tempfile.TemporaryDirectory() as d:
+        key_path = Path(d) / "key.json"
+        key_path.write_text(json.dumps({"private_key": kp.private_key_str}))
+        directory_path = Path(d) / "providers.json"
+        code = main(
+            [
+                "benchmark",
+                "--base-url",
+                "http://localhost:8080",
+                "--model",
+                MODEL,
+                "--runtime",
+                "ollama",
+                "--publish",
+                str(key_path),
+                "--advertised-url",
+                "http://my-node:8090",
+                "--announce",
+                str(directory_path),
+            ]
+        )
+        assert code == 0
+        found = FileDirectory(directory_path).discover(model=MODEL)
+        assert len(found) == 1
+        assert found[0].base_url == "http://my-node:8090"
+        assert found[0].manifest["benchmark"]["tokens_per_second"] == 48.5
+
+
+def test_cli_benchmark_announce_bad_key_returns_1(monkeypatch: object) -> None:
+    from sin_node.models import BenchmarkResult
+
+    fake = BenchmarkResult(model_alias=MODEL, runtime="ollama", ttft_ms=300.0, tokens_per_second=48.5)
+
+    import sin_cli.cli as cli
+
+    monkeypatch.setattr(cli, "benchmark_endpoint", lambda *_a, **_k: fake)  # type: ignore[attr-defined]
+
+    with tempfile.TemporaryDirectory() as d:
+        key_path = Path(d) / "key.json"
+        key_path.write_text(json.dumps({"private_key": "ed25519:not-a-valid-key"}))  # malformed
+        code = main(
+            [
+                "benchmark",
+                "--base-url",
+                "http://localhost:8080",
+                "--model",
+                MODEL,
+                "--publish",
+                str(key_path),
+                "--advertised-url",
+                "http://my-node:8090",
+                "--announce",
+                str(Path(d) / "providers.json"),
+            ]
+        )
+        assert code == 1  # a bad key surfaces as a clean exit 1, not a traceback

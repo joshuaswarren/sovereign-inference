@@ -16,6 +16,7 @@ from .directory import (
     DiscoveredProvider,
     DiscoveryQuery,
     FileDirectory,
+    HttpDirectory,
     arweave_discovery_query,
 )
 from .errors import DiscoveryError
@@ -29,5 +30,6 @@ __all__ = [
     "DiscoveryError",
     "DiscoveryQuery",
     "FileDirectory",
+    "HttpDirectory",
     "arweave_discovery_query",
 ]

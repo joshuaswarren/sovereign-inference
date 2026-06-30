@@ -7,6 +7,22 @@ follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 ## [Unreleased]
 
 ### Added
+- **Supply onboarding follow-ons — hosted directory, reputation, auto re-announce:**
+  - **Hosted directory service** — `sip_discovery.HttpDirectory` (a `Directory`
+    client over HTTP) and **`sip-directory-service`** (an AGPL FastAPI relay,
+    `create_directory_app`, over any `Directory` store). The relay is never
+    trusted: the client re-verifies every manifest and routes only to the signed
+    `manifest_uri`, and the server rejects forged manifests on announce.
+  - **`sip-reputation`** — `HealthProbe` (liveness + identity + model check at
+    `/sip/v1/health`), a persisted `ReputationStore` (records routing outcomes,
+    computes a bounded score, neutral cold-start), and `rank_providers` (drops
+    unreachable nodes, orders by reputation → latency → advertised throughput).
+  - **Auto re-announce** — `ShareConfig.benchmark` + `build_share_manifest` /
+    `reannounce` re-sign a fresh manifest (new `published_at` + benchmark), and
+    `sin benchmark --announce DIRECTORY` re-announces with the just-measured
+    metrics; directories keep the freshest entry per provider.
+  - **Supply demo** (`sip-supply-demo`): announce to a hosted directory → discover
+    → health/reputation rank → route → record outcome → re-benchmark + re-announce.
 - **Supply onboarding — `sin share` + provider discovery:**
   - **`sin share`**: one command turns a running node into a discoverable SIP
     provider — it fronts the local runtime adapter with the real provider gateway

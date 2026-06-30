@@ -60,6 +60,8 @@ class ShareConfig:
     output_per_1m: float = 0.0
     require_payment: bool = False
     pic_issuers: tuple[str, ...] = field(default_factory=tuple)
+    # advertised performance (e.g. from `sin benchmark`), embedded in the manifest
+    benchmark: dict[str, Any] | None = None
 
     def public_url(self) -> str:
         return self.advertised_url or f"http://{self.host}:{self.port}"
@@ -72,6 +74,37 @@ class ShareResult:
     app: Any
     manifest: dict[str, Any]
     base_url: str
+
+
+def build_share_manifest(
+    config: ShareConfig,
+    *,
+    keypair: KeyPair,
+    runtime_name: str,
+    now: Callable[[], datetime] = _utc_now,
+) -> dict[str, Any]:
+    """Build and sign the node's ``sovereign-node`` provider manifest.
+
+    Carries the node's public URL as ``manifest_uri`` and any configured
+    ``benchmark`` so the advertised perf is fresh on every (re-)announce.
+    """
+    return sign_provider_manifest(
+        build_provider_manifest(
+            provider_pubkey=keypair.public_key_str,
+            models=[config.model],
+            runtime_adapters=[runtime_name],
+            pricing_unit=config.pricing_unit,
+            input_per_1m=config.input_per_1m,
+            output_per_1m=config.output_per_1m,
+            node_type="sovereign-node",
+            max_context=config.max_context,
+            logging_policy=config.logging_policy,
+            benchmark=config.benchmark,
+            manifest_uri=config.public_url(),
+            published_at=now().astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        ),
+        keypair,
+    )
 
 
 def build_share(
@@ -87,22 +120,7 @@ def build_share(
     pointed at the locally running model; its ``chat`` is what the gateway calls.
     """
     base_url = config.public_url()
-    manifest = sign_provider_manifest(
-        build_provider_manifest(
-            provider_pubkey=keypair.public_key_str,
-            models=[config.model],
-            runtime_adapters=[adapter.name],
-            pricing_unit=config.pricing_unit,
-            input_per_1m=config.input_per_1m,
-            output_per_1m=config.output_per_1m,
-            node_type="sovereign-node",
-            max_context=config.max_context,
-            logging_policy=config.logging_policy,
-            manifest_uri=base_url,
-            published_at=now().astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        ),
-        keypair,
-    )
+    manifest = build_share_manifest(config, keypair=keypair, runtime_name=adapter.name, now=now)
     app = create_app(
         adapter=adapter,
         keypair=keypair,
@@ -125,3 +143,18 @@ def build_share(
 def announce_to_directory(directory: Directory, result: ShareResult) -> str:
     """Announce a share's signed manifest to ``directory``; return its reference."""
     return directory.announce(result.manifest, base_url=result.base_url)
+
+
+def reannounce(
+    directory: Directory,
+    config: ShareConfig,
+    *,
+    keypair: KeyPair,
+    runtime_name: str = DEFAULT_RUNTIME,
+    now: Callable[[], datetime] = _utc_now,
+) -> str:
+    """Re-sign a fresh manifest (new ``published_at`` + ``config.benchmark``) and
+    announce it. Directories keep the freshest entry per provider key, so a node
+    that re-benchmarks simply re-announces and routers see the updated metrics."""
+    manifest = build_share_manifest(config, keypair=keypair, runtime_name=runtime_name, now=now)
+    return directory.announce(manifest, base_url=config.public_url())

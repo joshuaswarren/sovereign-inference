@@ -54,8 +54,11 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
   verified providers — `FileDirectory` (offline shared JSON) + `ArweaveDirectory`
   (anchor + GraphQL query); signature-verified, freshest-per-key
 - ✅ `sip-discovery-demo`: announce → discover → route → verify, in-process
-- ⬜ Follow-ons: a hosted/relayed directory service, provider reputation + health
-  signals, automatic re-announce on benchmark refresh
+- ✅ Hosted/relayed directory service (`sip-directory-service` + `HttpDirectory`)
+- ✅ Provider reputation + health signals (`sip-reputation`: probe, score, rank)
+- ✅ Automatic re-announce on benchmark refresh (`sin benchmark --announce`)
+- ✅ `sip-supply-demo`: hosted directory + reputation rank + re-announce, in-process
+- ⬜ Further: directory federation/gossip, signed reputation attestations, staking
 
 ## Phase 5 — Privacy modes  (post-MVP)
 - ⬜ Relay hardening; Tor/Snowflake, I2P, and Nym-compatible transport experiments

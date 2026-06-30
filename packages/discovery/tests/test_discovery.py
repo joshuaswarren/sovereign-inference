@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 
 from sip_arweave import LocalAnchor
@@ -17,6 +18,7 @@ from sip_discovery import (
     DiscoveredProvider,
     DiscoveryError,
     FileDirectory,
+    HttpDirectory,
 )
 from sip_protocol.manifests import sign_provider_manifest
 from sip_protocol.signing import KeyPair
@@ -249,3 +251,84 @@ def test_arweave_directory_discover_skips_unverifiable_manifest() -> None:
     directory = ArweaveDirectory(anchor, query=query)
     found = directory.discover()
     assert [p.base_url for p in found] == ["http://good"]
+
+
+# -- HttpDirectory (client) -----------------------------------------------------
+
+
+def _mock_http_directory(handler: Any, *, base_url: str = "http://relay") -> HttpDirectory:
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    return HttpDirectory(base_url, client=client)
+
+
+def test_http_directory_announce_posts_signed_manifest() -> None:
+    kp = KeyPair.generate()
+    manifest = _manifest(kp, base_url="http://node")
+    captured: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"ref": manifest["provider_pubkey"]})
+
+    directory = _mock_http_directory(handler)
+    ref = directory.announce(manifest)
+    assert ref == manifest["provider_pubkey"]
+    assert captured["path"] == "/directory/announce"
+    assert captured["body"] == manifest
+
+
+def test_http_directory_announce_rejects_invalid_without_calling_server() -> None:
+    kp = KeyPair.generate()
+    manifest = _manifest(kp)
+    manifest["models"] = ["tampered"]
+    posted: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        posted.append(1)
+        return httpx.Response(200, json={})
+
+    directory = _mock_http_directory(handler)
+    with pytest.raises(DiscoveryError):
+        directory.announce(manifest)
+    assert posted == []  # an invalid manifest never reaches the relay
+
+
+def test_http_directory_discover_verifies_and_uses_signed_manifest_uri() -> None:
+    kp = KeyPair.generate()
+    good = _manifest(kp, base_url="http://honest-node")
+    forged = _manifest(KeyPair.generate(), base_url="http://attacker")
+    forged["models"] = ["tampered"]  # breaks the signature
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/directory/providers"
+        return httpx.Response(200, json={"providers": [forged, good]})
+
+    directory = _mock_http_directory(handler)
+    found = directory.discover()
+    # the relay cannot forge a manifest, and routing uses the signed manifest_uri
+    assert [p.base_url for p in found] == ["http://honest-node"]
+
+
+def test_http_directory_discover_passes_model_filter() -> None:
+    kp = KeyPair.generate()
+    manifest = _manifest(kp, models=["coder"], base_url="http://node")
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["model"] = request.url.params.get("model")
+        return httpx.Response(200, json={"providers": [manifest]})
+
+    directory = _mock_http_directory(handler)
+    found = directory.discover(model="coder")
+    assert seen["model"] == "coder"
+    assert len(found) == 1
+
+
+def test_http_directory_discover_http_error_raises() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503)
+
+    directory = _mock_http_directory(handler)
+    with pytest.raises(DiscoveryError):
+        directory.discover()
