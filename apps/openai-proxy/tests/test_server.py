@@ -171,3 +171,53 @@ def test_status_and_scan_endpoints_work(tmp_path: Path) -> None:
     client = _server(tmp_path)
     assert client.get("/api/status", headers=_auth()).json()["version"]
     assert client.get("/api/scan", headers=_auth()).json()["os"] == "testos"
+
+
+# -- directory mutation efficiency / idempotency (review fixes) ------------------
+
+
+class _CountingDirectory:
+    """A directory whose discover() returns nothing but counts how often it ran."""
+
+    def __init__(self, counter: dict[str, int]) -> None:
+        self._counter = counter
+
+    def discover(self, *, model: str | None = None) -> list[Any]:
+        self._counter["n"] += 1
+        return []
+
+
+def test_adding_the_same_directory_twice_does_not_refetch(tmp_path: Path) -> None:
+    counter = {"n": 0}
+    client = _server(tmp_path, directory_for=lambda _spec: _CountingDirectory(counter))
+    client.post("/api/directory", json={"spec": "https://dir.example"}, headers=_auth())
+    after_first = counter["n"]
+    # re-adding the same spec is a no-op: no persist, no rebuild, no re-fetch
+    body = client.post("/api/directory", json={"spec": "https://dir.example"}, headers=_auth()).json()
+    assert counter["n"] == after_first
+    assert body["directories"].count("https://dir.example") == 1
+
+
+def test_removing_an_unknown_directory_does_not_refetch(tmp_path: Path) -> None:
+    counter = {"n": 0}
+    client = _server(tmp_path, directory_for=lambda _spec: _CountingDirectory(counter))
+    client.post("/api/directory", json={"spec": "https://dir.example"}, headers=_auth())
+    after_add = counter["n"]
+    # deleting a spec that isn't configured changes nothing and doesn't re-fetch
+    resp = client.request("DELETE", "/api/directory", params={"spec": "https://other.example"}, headers=_auth())
+    assert resp.status_code == 200
+    assert resp.json()["directories"] == ["https://dir.example"]
+    assert counter["n"] == after_add
+
+
+def test_cors_regex_accepts_app_origins_and_rejects_bad_ports() -> None:
+    import re
+
+    from sip_openai_proxy.server import _ALLOW_ORIGIN_REGEX
+
+    assert re.match(_ALLOW_ORIGIN_REGEX, "http://127.0.0.1:11435")
+    assert re.match(_ALLOW_ORIGIN_REGEX, "http://localhost")
+    assert re.match(_ALLOW_ORIGIN_REGEX, "tauri://localhost")
+    assert re.match(_ALLOW_ORIGIN_REGEX, "https://tauri.localhost")
+    assert not re.match(_ALLOW_ORIGIN_REGEX, "http://127.0.0.1:99999")  # port > 65535
+    assert not re.match(_ALLOW_ORIGIN_REGEX, "http://evil.example")

@@ -10,7 +10,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::net::TcpStream;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
@@ -63,6 +64,12 @@ fn main() {
                 .expect("failed to start the app-server sidecar");
             app.state::<Sidecar>().0.lock().unwrap().replace(child);
 
+            // Tracks whether the sidecar exited, so the window-show poll below can
+            // stop waiting immediately if the server died (e.g. port in use) rather
+            // than blanking for the full timeout.
+            let exited = Arc::new(AtomicBool::new(false));
+            let exited_writer = exited.clone();
+
             // Forward sidecar logs to the app's stderr for debugging.
             tauri::async_runtime::spawn(async move {
                 while let Some(event) = rx.recv().await {
@@ -70,15 +77,24 @@ fn main() {
                         CommandEvent::Stderr(line) | CommandEvent::Stdout(line) => {
                             eprintln!("[server] {}", String::from_utf8_lossy(&line));
                         }
+                        CommandEvent::Terminated(payload) => {
+                            eprintln!("[server] exited: {:?}", payload);
+                            exited_writer.store(true, Ordering::SeqCst);
+                        }
                         _ => {}
                     }
                 }
             });
 
             // Create the window hidden, with the token injected BEFORE page scripts
-            // run, then reveal it once the server accepts connections.
+            // run, then reveal it once the server accepts connections. The token and
+            // base URL are JSON-serialized (not string-interpolated) so no value can
+            // break out of the script literal.
+            let api_base = format!("http://{HOST}:{PORT}");
             let init_script = format!(
-                "window.__SOVEREIGN__={{apiBase:'http://{HOST}:{PORT}',token:'{token}'}};"
+                "window.__SOVEREIGN__={{apiBase:{},token:{}}};",
+                serde_json::to_string(&api_base).expect("serialize api base"),
+                serde_json::to_string(&token).expect("serialize token"),
             );
             let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
                 .title("Sovereign Inference")
@@ -90,8 +106,13 @@ fn main() {
 
             std::thread::spawn(move || {
                 let addr = format!("{HOST}:{PORT}").parse().expect("valid loopback addr");
-                // Poll for up to ~30s for the sidecar to start listening.
+                // Wait up to ~30s for the sidecar to start listening, but bail early
+                // if it exited. Either way the window is shown (the dashboard surfaces
+                // an "unreachable" state itself) so it is never left permanently hidden.
                 for _ in 0..120 {
+                    if exited.load(Ordering::SeqCst) {
+                        break;
+                    }
                     if TcpStream::connect_timeout(&addr, Duration::from_millis(250)).is_ok() {
                         break;
                     }

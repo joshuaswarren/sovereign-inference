@@ -40,6 +40,7 @@ from sin_node import hardware
 from sin_node import recommend as recommend_module
 from sin_node.adapter import available_adapter_names
 from sin_node.catalog import load_catalog
+from sip_discovery import Directory
 from sip_router import ProviderRegistry, in_process_client
 
 from .app import ProxyBackend, build_backend, mount_proxy_routes
@@ -54,7 +55,12 @@ CatalogFn = Callable[[], Any]
 DetectFn = Callable[[], list[RuntimeStatus]]
 StartLocalFn = Callable[[str, str], LocalProvider]
 
-_ALLOW_ORIGIN_REGEX = r"^(tauri://localhost|https://tauri\.localhost|https?://(localhost|127\.0\.0\.1)(:\d+)?)$"
+# Only the app's own origins may call the API. Ports are bounded to 1-65535 so the
+# pattern can't admit a malformed/over-range origin.
+_PORT = r"(6553[0-5]|655[0-2]\d|65[0-4]\d{2}|6[0-4]\d{3}|[1-5]\d{4}|[1-9]\d{0,3})"
+_ALLOW_ORIGIN_REGEX = (
+    r"^(tauri://localhost|https://tauri\.localhost|https?://(localhost|127\.0\.0\.1)(:" + _PORT + r")?)$"
+)
 _REMOTE_TIMEOUT = httpx.Timeout(30.0, connect=5.0)
 
 
@@ -91,12 +97,22 @@ class _StartLocal(BaseModel):
 class _ServerState:
     """Holds the live config, the in-process local provider, and the routing backend."""
 
-    def __init__(self, config_dir: Path, start_local: StartLocalFn) -> None:
+    def __init__(
+        self,
+        config_dir: Path,
+        start_local: StartLocalFn,
+        directory_for: Callable[[str], Directory] | None = None,
+    ) -> None:
         self._dir = config_dir
         self._start_local = start_local
+        self._directory_for = directory_for
         self.config: AppConfig = load_config(config_dir)
         self.local: LocalProvider | None = None
-        self.warnings: list[str] = []
+        # Two warning sources, tracked separately: a boot-time local-restore failure
+        # (sticky until the local model changes), and per-rebuild source warnings
+        # (always recomputed from the *current* config). snapshot() unions them.
+        self._restore_warning: str | None = None
+        self._build_warnings: list[str] = []
         self.backend: ProxyBackend = build_backend(ProviderRegistry())
         self._restore_local()
         self.rebuild()
@@ -107,6 +123,7 @@ class _ServerState:
         return httpx.Client(base_url=base_url, timeout=_REMOTE_TIMEOUT)
 
     def _restore_local(self) -> None:
+        self._restore_warning = None
         if self.config.local_use is None:
             self.local = None
             return
@@ -114,15 +131,19 @@ class _ServerState:
             self.local = self._start_local(self.config.local_use.runtime, self.config.local_use.model)
         except Exception as exc:  # a model that won't start on boot is a warning, not a crash
             self.local = None
-            self.warnings.append(f"local model {self.config.local_use.model!r} could not be restored: {exc}")
+            self._restore_warning = f"local model {self.config.local_use.model!r} could not be restored: {exc}"
 
     def rebuild(self) -> None:
-        registry, warnings = build_registry(self.config)
+        registry, warnings = build_registry(self.config, directory_for=self._directory_for)
         if self.local is not None:
             registry.add(self.local.entry)
         self.backend = build_backend(registry, token=self.config.token, client_factory=self._client_factory)
-        # keep restore-time warnings, append the source warnings from this build
-        self.warnings = [w for w in self.warnings if "could not be restored" in w] + warnings
+        self._build_warnings = warnings
+
+    @property
+    def warnings(self) -> list[str]:
+        """All current warnings: the sticky local-restore warning plus build ones."""
+        return ([self._restore_warning] if self._restore_warning else []) + self._build_warnings
 
     def persist(self) -> None:
         save_config(self._dir, self.config)
@@ -161,10 +182,11 @@ def create_app_server(
     catalog: CatalogFn = load_catalog,
     detect: DetectFn = detect_runtimes,
     start_local: StartLocalFn = _default_start_local,
+    directory_for: Callable[[str], Directory] | None = None,
     dashboard_dir: str | Path | None = None,
 ) -> FastAPI:
     """Build the unified desktop app server rooted at ``config_dir``."""
-    state = _ServerState(Path(config_dir), start_local)
+    state = _ServerState(Path(config_dir), start_local, directory_for)
     app = FastAPI(title="Sovereign Inference — desktop app server")
     app.add_middleware(
         CORSMiddleware,
@@ -227,6 +249,7 @@ def create_app_server(
     def complete_onboarding() -> dict[str, Any]:
         state.config = replace(state.config, onboarding_complete=True)
         state.persist()
+        state.rebuild()  # refresh warnings/backend against the final config
         return state.snapshot()
 
     @api.post("/providers")
@@ -254,17 +277,18 @@ def create_app_server(
         spec = body.spec
         if spec.startswith(("http://", "https://")) and not is_safe_remote_url(spec):
             raise HTTPException(status_code=400, detail=f"directory URL {spec!r} is not a safe public endpoint")
-        if spec not in state.config.directories:
+        if spec not in state.config.directories:  # adding a known spec is a no-op (no re-fetch)
             state.config = replace(state.config, directories=(*state.config.directories, spec))
             state.persist()
-        state.rebuild()
+            state.rebuild()
         return state.snapshot()
 
     @api.delete("/directory")
     def remove_directory(spec: str = Query(...)) -> dict[str, Any]:
-        state.config = replace(state.config, directories=tuple(d for d in state.config.directories if d != spec))
-        state.persist()
-        state.rebuild()
+        if spec in state.config.directories:  # removing an unknown spec is a no-op
+            state.config = replace(state.config, directories=tuple(d for d in state.config.directories if d != spec))
+            state.persist()
+            state.rebuild()
         return state.snapshot()
 
     @api.post("/local-use")
