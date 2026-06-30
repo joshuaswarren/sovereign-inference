@@ -9,6 +9,29 @@ permissions:
   contents: read
 
 jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Sync workspace
+        run: uv sync --all-extras --dev
+      - name: Audit dependencies (pip-audit, advisory)
+        continue-on-error: true
+        run: uv run --with pip-audit pip-audit
+      - name: Generate SBOM (CycloneDX)
+        run: uv run --with cyclonedx-bom cyclonedx-py environment -o sbom.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          if-no-files-found: warn
+
   test:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -35,7 +58,7 @@ jobs:
         run: uv run ruff check packages adapters apps
 
       - name: mypy (typed libraries)
-        run: uv run mypy packages/sip-protocol/src packages/receipt-verifier/src packages/sin-node/src packages/sin-cli/src packages/compute/src packages/arweave-anchor/src packages/discovery/src packages/reputation/src packages/pic-vouchers/src packages/policy/src adapters/runtime-ollama/src adapters/runtime-llamacpp/src adapters/provider-nosana/src adapters/provider-akash/src apps/router-demo/src apps/directory-service/src apps/relay/src apps/openai-proxy/src
+        run: uv run mypy packages/sip-protocol/src packages/receipt-verifier/src packages/sin-node/src packages/sin-cli/src packages/compute/src packages/arweave-anchor/src packages/discovery/src packages/reputation/src packages/pic-vouchers/src packages/policy/src packages/plugins/src adapters/runtime-ollama/src adapters/runtime-llamacpp/src adapters/provider-nosana/src adapters/provider-akash/src apps/router-demo/src apps/directory-service/src apps/relay/src apps/openai-proxy/src
 
       - name: Tests
         run: uv run pytest --cov --cov-report=term-missing

@@ -3,6 +3,25 @@
 A running log of what's done and what's next. See [ROADMAP.md](ROADMAP.md) for
 the phased plan and [CHANGELOG.md](CHANGELOG.md) for released changes.
 
+## 2026-06-30 — Phase 6 (part 2): plugin SDK + supply-chain hardening + desktop scaffold
+
+**Done** (branch `feat/phase-6-plugins-security`, PR pending)
+- **`sip-plugins`** (Apache, TDD): entry-point discovery + registration for runtime
+  adapters / compute providers / directories; `discover`/`load_all` skip a plugin
+  that fails to import (one bad plugin can't break the host). Injectable entry-point
+  source + registrar → unit-tested without installing packages.
+- **Supply-chain hardening**: CI `security` job runs `pip-audit` (advisory; locked
+  set is currently clean) + publishes a CycloneDX `sbom.json` artifact;
+  `RELEASING.md` documents reproducible builds + Sigstore/minisign signing + verify.
+- **Desktop scaffold** (`apps/desktop`, Tauri v2): `tauri.conf.json` (dashboard as
+  frontend + proxy as `externalBin` sidecar), Rust shell that spawns the sidecar,
+  README with the local build steps. Plus `python -m sip_openai_proxy` for freezing
+  the sidecar. (Binary build needs the local Rust/Tauri toolchain — honest scaffold.)
+- 517 tests; ruff + mypy --strict clean. Focused adversarial review run.
+
+**Next:** built/notarized installers in a release workflow; deeper privacy + directory
+federation per the roadmap.
+
 ## 2026-06-30 — Phase 6 (part 1): local OpenAI-compatible endpoint + policy
 
 **Done** (branch `feat/phase-6-openai-proxy`, PR pending)

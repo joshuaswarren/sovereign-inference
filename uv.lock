@@ -20,6 +20,7 @@ members = [
     "sip-discovery",
     "sip-openai-proxy",
     "sip-pic",
+    "sip-plugins",
     "sip-policy",
     "sip-protocol",
     "sip-provider-akash",
@@ -1173,6 +1174,21 @@ dependencies = [
 requires-dist = [
     { name = "cryptography", specifier = ">=42" },
     { name = "sip-protocol", editable = "packages/sip-protocol" },
+]
+
+[[package]]
+name = "sip-plugins"
+version = "0.1.2"
+source = { editable = "packages/plugins" }
+dependencies = [
+    { name = "sin-node" },
+    { name = "sip-compute" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "sin-node", editable = "packages/sin-node" },
+    { name = "sip-compute", editable = "packages/compute" },
 ]
 
 [[package]]
