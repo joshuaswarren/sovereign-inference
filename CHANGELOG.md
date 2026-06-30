@@ -7,6 +7,17 @@ follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 ## [Unreleased]
 
 ### Added
+- **Phase 6 — production usability: a local OpenAI-compatible endpoint + policy:**
+  - **`sip-openai-proxy`** (AGPL): run one server (`sip-openai-proxy --registry … --port 11435`)
+    and point any OpenAI client (the `openai` SDK, LangChain, LM Studio, `curl`) at
+    `http://localhost:11435/v1` — requests route across SIP-AI providers with failover,
+    and every answer carries a verified signed receipt (under a `sip` extension field).
+    Exposes `GET /v1/models`, `POST /v1/chat/completions` (streaming + non-streaming),
+    `GET /healthz`; optional API-key auth.
+  - **`sip-policy`**: a declarative `Policy` governing which providers may serve —
+    require TEE attestation (and which types), price caps + accepted units, required
+    privacy modes, provider allow/deny lists, and a minimum reputation. The proxy
+    applies it to filter providers (and the advertised model list).
 - **Phase 5 — privacy modes (relay, TEE attestation, issuer-unlinkable credits):**
   - **`sip-relay`** (AGPL): a privacy relay that forwards a completion to a provider
     so the provider sees the relay, not the client. The relay routes **only to the

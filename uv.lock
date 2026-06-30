@@ -18,7 +18,9 @@ members = [
     "sip-compute",
     "sip-directory-service",
     "sip-discovery",
+    "sip-openai-proxy",
     "sip-pic",
+    "sip-policy",
     "sip-protocol",
     "sip-provider-akash",
     "sip-provider-gateway",
@@ -1136,6 +1138,29 @@ requires-dist = [
 ]
 
 [[package]]
+name = "sip-openai-proxy"
+version = "0.1.2"
+source = { editable = "apps/openai-proxy" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "sip-discovery" },
+    { name = "sip-policy" },
+    { name = "sip-protocol" },
+    { name = "sip-router" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.110" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "sip-discovery", editable = "packages/discovery" },
+    { name = "sip-policy", editable = "packages/policy" },
+    { name = "sip-protocol", editable = "packages/sip-protocol" },
+    { name = "sip-router", editable = "packages/router" },
+]
+
+[[package]]
 name = "sip-pic"
 version = "0.1.2"
 source = { editable = "packages/pic-vouchers" }
@@ -1149,6 +1174,17 @@ requires-dist = [
     { name = "cryptography", specifier = ">=42" },
     { name = "sip-protocol", editable = "packages/sip-protocol" },
 ]
+
+[[package]]
+name = "sip-policy"
+version = "0.1.2"
+source = { editable = "packages/policy" }
+dependencies = [
+    { name = "sip-protocol" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "sip-protocol", editable = "packages/sip-protocol" }]
 
 [[package]]
 name = "sip-protocol"
