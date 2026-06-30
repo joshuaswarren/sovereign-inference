@@ -12,7 +12,7 @@ sin recommend --task coding [--top N]      # ranked model/quant picks that fit
 sin catalog [--json]                       # the curated model catalog
 sin serve --runtime ollama --model NAME    # start a local OpenAI-compatible server
 sin install --runtime ollama --model NAME  # pull a model
-sin benchmark --base-url URL --model NAME [--publish KEYFILE]
+sin benchmark --base-url URL --model NAME [--publish KEYFILE] [--announce DIR --advertised-url URL]
 sin share --runtime ollama --model NAME    # expose this node as a discoverable SIP provider
 sin status                                 # registered runtime adapters
 sin version

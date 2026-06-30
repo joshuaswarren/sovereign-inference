@@ -215,6 +215,65 @@ class ArweaveDirectory:
         return value if isinstance(value, dict) else None
 
 
+_HTTP_TIMEOUT_S = 30.0
+
+
+class HttpDirectory:
+    """A :class:`Directory` client for a hosted directory service (relay).
+
+    ``announce`` POSTs a locally-verified manifest; ``discover`` GETs the relay's
+    provider list. The relay is **never trusted**: every returned manifest is
+    re-verified client-side and the routed endpoint is taken from the *signed*
+    ``manifest_uri``, so a malicious relay can neither forge a provider nor
+    redirect routing.
+    """
+
+    def __init__(self, base_url: str, *, client: httpx.Client | None = None) -> None:
+        self._base = base_url.rstrip("/")
+        self._client = client
+
+    def announce(self, manifest: dict[str, Any], *, base_url: str | None = None) -> str:
+        _require_verified(manifest)
+        _signed_endpoint(manifest, base_url)  # validate before sending
+        owns = self._client is None
+        client = self._client or httpx.Client(timeout=_HTTP_TIMEOUT_S)
+        try:
+            response = client.post(f"{self._base}/directory/announce", json=manifest)
+            response.raise_for_status()
+            data = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise DiscoveryError(f"announce to {self._base} failed") from exc
+        finally:
+            if owns:
+                client.close()
+        ref = data.get("ref") if isinstance(data, dict) else None
+        return str(ref) if ref else str(manifest["provider_pubkey"])
+
+    def discover(self, *, model: str | None = None) -> list[DiscoveredProvider]:
+        owns = self._client is None
+        client = self._client or httpx.Client(timeout=_HTTP_TIMEOUT_S)
+        params = {"model": model} if model else {}
+        try:
+            response = client.get(f"{self._base}/directory/providers", params=params)
+            response.raise_for_status()
+            payload = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise DiscoveryError(f"discover from {self._base} failed") from exc
+        finally:
+            if owns:
+                client.close()
+        manifests = payload.get("providers", []) if isinstance(payload, dict) else []
+        providers: list[DiscoveredProvider] = []
+        for manifest in manifests:
+            if not isinstance(manifest, dict) or not verify_provider_manifest(manifest):
+                continue  # the relay cannot forge a signed manifest
+            uri = manifest.get("manifest_uri")
+            if not isinstance(uri, str) or not uri:
+                continue
+            providers.append(DiscoveredProvider(base_url=uri, manifest=manifest))
+        return _filter_and_dedupe(providers, model=model)
+
+
 _ARWEAVE_GATEWAY = "https://arweave.net"
 _GRAPHQL_TIMEOUT_S = 30.0
 

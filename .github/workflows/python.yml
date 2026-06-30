@@ -35,7 +35,7 @@ jobs:
         run: uv run ruff check packages adapters apps
 
       - name: mypy (typed libraries)
-        run: uv run mypy packages/sip-protocol/src packages/receipt-verifier/src packages/sin-node/src packages/sin-cli/src packages/compute/src packages/arweave-anchor/src packages/discovery/src adapters/runtime-ollama/src adapters/runtime-llamacpp/src adapters/provider-nosana/src adapters/provider-akash/src apps/router-demo/src
+        run: uv run mypy packages/sip-protocol/src packages/receipt-verifier/src packages/sin-node/src packages/sin-cli/src packages/compute/src packages/arweave-anchor/src packages/discovery/src packages/reputation/src adapters/runtime-ollama/src adapters/runtime-llamacpp/src adapters/provider-nosana/src adapters/provider-akash/src apps/router-demo/src apps/directory-service/src
 
       - name: Tests
         run: uv run pytest --cov --cov-report=term-missing
@@ -63,6 +63,9 @@ jobs:
 
       - name: Discovery demo smoke test (announce → discover → route → verify)
         run: uv run sip-discovery-demo
+
+      - name: Supply demo smoke test (hosted directory + reputation + re-announce)
+        run: uv run sip-supply-demo
 
       - name: Share publish smoke test (sin share --no-serve → discoverable manifest)
         shell: bash

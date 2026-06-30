@@ -243,6 +243,9 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
         _err.print(f"[red]benchmark failed:[/red] {exc}")
         return 1
 
+    if args.announce:
+        return _benchmark_announce(args, result)
+
     if not args.publish:
         _print_json(result.model_dump(mode="json"))
         return 0
@@ -263,6 +266,34 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
         _err.print(f"[red]publish failed:[/red] {exc}")
         return 1
     _print_json(manifest)
+    return 0
+
+
+def _benchmark_announce(args: argparse.Namespace, result: Any) -> int:
+    """Re-announce the node's manifest with fresh benchmark metrics to a directory."""
+    if not args.publish:
+        _err.print("[red]--announce requires --publish KEYFILE for the provider identity[/red]")
+        return 1
+    if not args.advertised_url:
+        _err.print("[red]--announce requires --advertised-url for the node's public URL[/red]")
+        return 1
+    try:
+        from sip_discovery import FileDirectory
+
+        from .share import ShareConfig, reannounce
+
+        keypair = _load_keypair(args.publish)
+        config = ShareConfig(
+            model=args.model,
+            runtime=args.runtime,
+            advertised_url=args.advertised_url,
+            benchmark={"tokens_per_second": result.tokens_per_second, "ttft_ms": result.ttft_ms},
+        )
+        ref = reannounce(FileDirectory(args.announce), config, keypair=keypair, runtime_name=args.runtime)
+    except Exception as exc:  # surface any publish/announce failure as a clean exit 1
+        _err.print(f"[red]announce failed:[/red] {exc}")
+        return 1
+    _out.print(f"re-announced {args.model} ({result.tokens_per_second:.1f} tok/s) to {args.announce} as {ref}")
     return 0
 
 
@@ -361,6 +392,12 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="KEYFILE",
         help="sign and print a provider manifest using the key pair in this sip-receipt keygen JSON file",
     )
+    p_bench.add_argument(
+        "--announce",
+        metavar="DIRECTORY",
+        help="re-announce the node to this directory file with the fresh benchmark (needs --publish + --advertised-url)",
+    )
+    p_bench.add_argument("--advertised-url", help="public URL to advertise when --announce is used")
     p_bench.set_defaults(func=cmd_benchmark)
 
     p_status = sub.add_parser("status", help="show node version and registered runtime adapters")

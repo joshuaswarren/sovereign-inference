@@ -16,6 +16,7 @@ members = [
     "sin-node",
     "sip-arweave",
     "sip-compute",
+    "sip-directory-service",
     "sip-discovery",
     "sip-pic",
     "sip-protocol",
@@ -23,6 +24,7 @@ members = [
     "sip-provider-gateway",
     "sip-provider-nosana",
     "sip-receipts",
+    "sip-reputation",
     "sip-router",
     "sip-router-demo",
     "sip-runtime-llamacpp",
@@ -1099,6 +1101,23 @@ dependencies = [
 requires-dist = [{ name = "sip-protocol", editable = "packages/sip-protocol" }]
 
 [[package]]
+name = "sip-directory-service"
+version = "0.1.2"
+source = { editable = "apps/directory-service" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "sip-discovery" },
+    { name = "sip-protocol" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.110" },
+    { name = "sip-discovery", editable = "packages/discovery" },
+    { name = "sip-protocol", editable = "packages/sip-protocol" },
+]
+
+[[package]]
 name = "sip-discovery"
 version = "0.1.2"
 source = { editable = "packages/discovery" }
@@ -1210,6 +1229,23 @@ dependencies = [
 requires-dist = [{ name = "sip-protocol", editable = "packages/sip-protocol" }]
 
 [[package]]
+name = "sip-reputation"
+version = "0.1.2"
+source = { editable = "packages/reputation" }
+dependencies = [
+    { name = "httpx" },
+    { name = "sip-discovery" },
+    { name = "sip-protocol" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "sip-discovery", editable = "packages/discovery" },
+    { name = "sip-protocol", editable = "packages/sip-protocol" },
+]
+
+[[package]]
 name = "sip-router"
 version = "0.1.2"
 source = { editable = "packages/router" }
@@ -1237,12 +1273,14 @@ dependencies = [
     { name = "sin-node" },
     { name = "sip-arweave" },
     { name = "sip-compute" },
+    { name = "sip-directory-service" },
     { name = "sip-discovery" },
     { name = "sip-pic" },
     { name = "sip-protocol" },
     { name = "sip-provider-akash" },
     { name = "sip-provider-gateway" },
     { name = "sip-provider-nosana" },
+    { name = "sip-reputation" },
     { name = "sip-router" },
 ]
 
@@ -1252,12 +1290,14 @@ requires-dist = [
     { name = "sin-node", editable = "packages/sin-node" },
     { name = "sip-arweave", editable = "packages/arweave-anchor" },
     { name = "sip-compute", editable = "packages/compute" },
+    { name = "sip-directory-service", editable = "apps/directory-service" },
     { name = "sip-discovery", editable = "packages/discovery" },
     { name = "sip-pic", editable = "packages/pic-vouchers" },
     { name = "sip-protocol", editable = "packages/sip-protocol" },
     { name = "sip-provider-akash", editable = "adapters/provider-akash" },
     { name = "sip-provider-gateway", editable = "packages/provider-gateway" },
     { name = "sip-provider-nosana", editable = "adapters/provider-nosana" },
+    { name = "sip-reputation", editable = "packages/reputation" },
     { name = "sip-router", editable = "packages/router" },
 ]
 

@@ -3,6 +3,26 @@
 A running log of what's done and what's next. See [ROADMAP.md](ROADMAP.md) for
 the phased plan and [CHANGELOG.md](CHANGELOG.md) for released changes.
 
+## 2026-06-30 — Supply follow-ons: hosted directory, reputation, auto re-announce
+
+**Done** (branch `feat/directory-service-reputation-reannounce`, PR pending)
+- **Hosted directory** — `sip_discovery.HttpDirectory` client + **`sip-directory-service`**
+  (AGPL FastAPI `create_directory_app` over any `Directory` store). Relay is untrusted:
+  client re-verifies manifests + routes only to the signed `manifest_uri`; server 400s
+  forged manifests on announce.
+- **`sip-reputation`** — `HealthProbe` (liveness + pubkey/model identity at `/sip/v1/health`),
+  persisted `ReputationStore` (outcome counters → bounded score, neutral cold-start),
+  `rank_providers` (drops unreachable, orders by reputation → latency → tps).
+- **Auto re-announce** — `ShareConfig.benchmark` + `build_share_manifest`/`reannounce`;
+  `sin benchmark --announce DIR` re-announces with the just-measured metrics; freshest
+  per pubkey wins.
+- **`sip-supply-demo`** — announce (hosted) → discover → rank → route → record → re-announce.
+- 475 tests; ruff + mypy --strict clean. CI extended (reputation + directory-service in
+  the mypy list; supply-demo smoke step). Adversarial review run.
+
+**Next:** open PR; further follow-ons (directory federation/gossip, signed reputation
+attestations, staking) and Phase 5 privacy modes.
+
 ## 2026-06-29 — Supply onboarding: `sin share` + provider discovery
 
 **Done** (branch `feat/sin-share-and-discovery`, PR pending)
