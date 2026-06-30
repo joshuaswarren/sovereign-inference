@@ -66,8 +66,7 @@ class AppConfig:
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> AppConfig:
         providers = tuple(
-            ProviderEntry(base_url=str(p["base_url"]), manifest=dict(p["manifest"]))
-            for p in data.get("providers", [])
+            ProviderEntry(base_url=str(p["base_url"]), manifest=dict(p["manifest"])) for p in data.get("providers", [])
         )
         local_use_raw = data.get("local_use")
         return cls(
