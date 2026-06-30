@@ -7,11 +7,11 @@
     "core:default",
     {
       "identifier": "shell:allow-execute",
-      "allow": [{ "name": "binaries/sip-openai-proxy", "sidecar": true, "args": true }]
+      "allow": [{ "name": "binaries/sip-app-server", "sidecar": true, "args": true }]
     },
     {
       "identifier": "shell:allow-spawn",
-      "allow": [{ "name": "binaries/sip-openai-proxy", "sidecar": true, "args": true }]
+      "allow": [{ "name": "binaries/sip-app-server", "sidecar": true, "args": true }]
     }
   ]
 }

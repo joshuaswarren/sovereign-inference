@@ -10,16 +10,9 @@
     "beforeBuildCommand": "pnpm --dir ../dashboard build"
   },
   "app": {
-    "windows": [
-      {
-        "title": "Sovereign Inference",
-        "width": 1100,
-        "height": 760,
-        "resizable": true
-      }
-    ],
+    "windows": [],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://localhost:11435 http://127.0.0.1:11435"
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:11435 http://127.0.0.1:11435"
     }
   },
   "bundle": {
@@ -34,7 +27,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/sip-openai-proxy"],
+    "externalBin": ["binaries/sip-app-server"],
     "resources": []
   },
   "plugins": {}

@@ -84,10 +84,15 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ **Supply-chain hardening**: CI dependency audit (`pip-audit`) + CycloneDX SBOM
   artifact + [`RELEASING.md`](RELEASING.md) (reproducible + signed releases).
 - ✅ **Cross-platform desktop app (Tauri)** (`apps/desktop`): bundles the dashboard +
-  the Python OpenAI-proxy sidecar; **built + verified on macOS arm64** (`.app` + `.dmg`;
-  launches and serves `http://localhost:11435/v1`). Linux/Windows build the same way
-  on those platforms.
-- ⬜ Remaining: notarized/signed installers in a release workflow; an in-app onboarding flow.
+  a unified **app-server** sidecar; **built + verified on macOS arm64** (`.app` + `.dmg`;
+  serves `http://localhost:11435/v1`). Linux/Windows build the same way on those platforms.
+- ✅ **In-app first-run onboarding**: a wizard to use a local model (Ollama / llama.cpp,
+  fronted in-process with verified receipts) and/or connect to network providers/directories,
+  with a built-in test chat; persisted config, live re-configuration, a token-guarded admin
+  API, a signed-`manifest_uri` trust boundary, and a parent-death watchdog so the sidecar
+  never orphans. Verified live (real local inference + verified receipt).
+- ⬜ Remaining: notarized/signed installers in a release workflow; secrets in the OS keychain;
+  model-pull progress UI; `--onedir`/startup-time tuning.
 
 ## How to help
 Pick an unchecked item, open an issue if one doesn't exist, and see

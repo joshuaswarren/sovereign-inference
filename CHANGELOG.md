@@ -7,6 +7,39 @@ follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 ## [Unreleased]
 
 ### Added
+- **Desktop app — first-run onboarding + a unified app server (fully usable):**
+  - The desktop app now ships a **unified app server** sidecar (`sip-app-server`)
+    that serves the OpenAI endpoint (`/v1/*`), the node-status API (`/api/*`), the
+    dashboard, and a new **onboarding/admin API** on one loopback origin — with a
+    **routing backend rebuilt live** on every change (no restart) and config
+    **persisted** to the OS app-data dir (restored on boot, including re-fronting a
+    local model).
+  - **First-run onboarding wizard**: choose where inference comes from —
+    **a model on this computer** (detects Ollama / llama.cpp and fronts it through
+    the real provider gateway *in-process*, so even local inference returns a
+    signed, verified receipt) and/or **the network** (add a discovery directory or
+    a signed provider manifest). Ends with a built-in **test chat** showing the
+    verified receipt. The dashboard is gated behind onboarding, so its panels never
+    load against an unconfigured node.
+  - **Trust boundary** (`sip_openai_proxy.sources`): a provider is only routed to
+    when its manifest signature is valid **and** the routing target is the signed
+    `manifest_uri` (an attacker `base_url` is rejected); remote endpoints are
+    SSRF-guarded, and an endpoint pinned to one key can't be hijacked by another
+    (trust-on-first-use).
+  - **Admin API auth**: mutating `/api` routes require a per-install token the
+    desktop shell generates and injects into the webview; the sidecar runs the
+    OpenAI proxy + node status + admin behind it.
+  - **Robust lifecycle**: the shell gates the window on a health check and kills
+    the sidecar on exit; the sidecar also self-exits via a **parent-death
+    watchdog**, so it never orphans — even if the app is force-killed.
+  - **Reliable packaging**: a PyInstaller spec bundles the data the frozen app
+    needs (model catalog, JSON Schemas, the dashboard, adapter entry-points), with
+    a `sys._MEIPASS`-aware resolver — fixing the class of bug that passes in dev and
+    fails only in the packaged `.app`. Verified by a frozen-binary smoke test and a
+    live run doing real local inference with a verified receipt.
+  - **`sip_router.in_process_client`** (a `ThreadedASGITransport`): route to an
+    in-process provider app with a real `httpx.Client` and no socket — the seam the
+    local-model path and the privacy relay now share.
 - **Phase 6 — production usability: a local OpenAI-compatible endpoint + policy:**
   - **`sip-openai-proxy`** (AGPL): run one server (`sip-openai-proxy --registry … --port 11435`)
     and point any OpenAI client (the `openai` SDK, LangChain, LM Studio, `curl`) at

@@ -33,5 +33,8 @@ jobs:
       - name: Typecheck dashboard
         run: pnpm --filter @sovereign-inference/dashboard typecheck
 
+      - name: Test dashboard
+        run: pnpm --filter @sovereign-inference/dashboard test
+
       - name: Build dashboard
         run: pnpm --filter @sovereign-inference/dashboard build

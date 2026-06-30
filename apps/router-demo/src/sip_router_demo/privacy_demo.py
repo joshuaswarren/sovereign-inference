@@ -18,8 +18,6 @@ Run it with ``uv run sip-privacy-demo``.
 
 from __future__ import annotations
 
-import asyncio
-import concurrent.futures
 from dataclasses import dataclass
 from typing import Any
 
@@ -43,6 +41,7 @@ from sip_protocol import (
     sign_attestation,
 )
 from sip_relay import create_relay_app, relay_chat
+from sip_router import in_process_client as _client
 
 from .demo import MODEL
 
@@ -50,36 +49,6 @@ NODE_URL = "http://attested-node"
 RELAY_URL = "http://relay"
 TEE_TYPE = "intel-tdx"
 CREDIT = "0.03"
-
-
-class _ThreadedASGITransport(httpx.BaseTransport):
-    """Drive an ASGI app via ``asyncio.run`` inside a worker thread.
-
-    A worker thread has no running event loop, so this composes safely even when
-    one ASGI app (the relay) forwards into another (the provider) — unlike a bare
-    ``asyncio.run`` in the calling thread.
-    """
-
-    def __init__(self, app: Any) -> None:
-        self._async = httpx.ASGITransport(app=app)
-
-    def handle_request(self, request: httpx.Request) -> httpx.Response:
-        async def _go() -> tuple[int, list[tuple[bytes, bytes]], bytes]:
-            response = await self._async.handle_async_request(request)
-            body = await response.aread()
-            await response.aclose()
-            return response.status_code, list(response.headers.raw), body
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            status, headers, body = pool.submit(lambda: asyncio.run(_go())).result()
-        return httpx.Response(status_code=status, headers=headers, content=body, request=request)
-
-    def close(self) -> None:
-        """No persistent resources to release."""
-
-
-def _client(app: Any, base_url: str) -> httpx.Client:
-    return httpx.Client(transport=_ThreadedASGITransport(app), base_url=base_url)
 
 
 @dataclass(frozen=True, slots=True)

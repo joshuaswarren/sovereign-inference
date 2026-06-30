@@ -1,93 +1,39 @@
 import { useEffect, useState } from "react";
 
-import { fetchHardware, fetchRecommendations, fetchStatus } from "./api";
-import { HardwareCard } from "./components/HardwareCard";
-import { ReceiptsPanel } from "./components/ReceiptsPanel";
-import { RecommendationsTable } from "./components/RecommendationsTable";
-import { SharingPanel } from "./components/SharingPanel";
-import { StatusBar } from "./components/StatusBar";
-import type { HardwareProfile, Recommendation, StatusResponse, Task } from "./types";
+import { Dashboard } from "./Dashboard";
+import { Onboarding } from "./onboarding/Onboarding";
+import { type ConfigState, getConfig } from "./onboarding/api";
 
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
+type Gate = { phase: "loading" } | { phase: "onboarding"; config: ConfigState } | { phase: "ready" };
 
+/** Root gate: decide between first-run onboarding and the node dashboard BEFORE
+ * any dashboard data fetch runs. We ask the app server for its config first; an
+ * unconfigured node shows the wizard, a configured one shows the dashboard. */
 export function App() {
-  const [status, setStatus] = useState<StatusResponse | null>(null);
-  const [statusLoading, setStatusLoading] = useState(true);
-  const [statusError, setStatusError] = useState<string | null>(null);
-
-  const [hardware, setHardware] = useState<HardwareProfile | null>(null);
-  const [hardwareLoading, setHardwareLoading] = useState(true);
-  const [hardwareError, setHardwareError] = useState<string | null>(null);
-
-  const [task, setTask] = useState<Task>("coding");
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [recLoading, setRecLoading] = useState(true);
-  const [recError, setRecError] = useState<string | null>(null);
+  const [gate, setGate] = useState<Gate>({ phase: "loading" });
 
   useEffect(() => {
-    const controller = new AbortController();
-    setStatusLoading(true);
-    setStatusError(null);
-    fetchStatus(controller.signal)
-      .then(setStatus)
-      .catch((err: unknown) => {
-        if (!controller.signal.aborted) setStatusError(errorMessage(err));
+    let cancelled = false;
+    getConfig()
+      .then((config) => {
+        if (cancelled) return;
+        setGate(config.onboarding_complete ? { phase: "ready" } : { phase: "onboarding", config });
       })
-      .finally(() => {
-        if (!controller.signal.aborted) setStatusLoading(false);
+      .catch(() => {
+        // No admin API reachable (e.g. the dashboard served standalone) — fall
+        // back to the dashboard rather than blocking on the wizard.
+        if (!cancelled) setGate({ phase: "ready" });
       });
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    setHardwareLoading(true);
-    setHardwareError(null);
-    fetchHardware(controller.signal)
-      .then(setHardware)
-      .catch((err: unknown) => {
-        if (!controller.signal.aborted) setHardwareError(errorMessage(err));
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setHardwareLoading(false);
-      });
-    return () => controller.abort();
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setRecLoading(true);
-    setRecError(null);
-    fetchRecommendations(task, controller.signal)
-      .then(setRecommendations)
-      .catch((err: unknown) => {
-        if (!controller.signal.aborted) setRecError(errorMessage(err));
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setRecLoading(false);
-      });
-    return () => controller.abort();
-  }, [task]);
-
-  return (
-    <div className="app">
-      <StatusBar status={status} loading={statusLoading} error={statusError} />
-      <main className="app__main">
-        <HardwareCard profile={hardware} loading={hardwareLoading} error={hardwareError} />
-        <RecommendationsTable
-          task={task}
-          onTaskChange={setTask}
-          recommendations={recommendations}
-          loading={recLoading}
-          error={recError}
-        />
-        <div className="panel-row">
-          <SharingPanel />
-          <ReceiptsPanel />
-        </div>
-      </main>
-    </div>
-  );
+  if (gate.phase === "loading") {
+    return <div className="app app--center">Starting Sovereign Inference…</div>;
+  }
+  if (gate.phase === "onboarding") {
+    return <Onboarding initialConfig={gate.config} onComplete={() => setGate({ phase: "ready" })} />;
+  }
+  return <Dashboard />;
 }

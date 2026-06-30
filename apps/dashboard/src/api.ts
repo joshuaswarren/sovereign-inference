@@ -1,5 +1,7 @@
-// Typed fetchers for the SIN node's local HTTP API. All requests go through the
-// /api prefix, which Vite proxies to the node (default http://localhost:8009).
+// Typed fetchers for the SIN node's local HTTP API. Requests resolve against
+// API_BASE (same-origin under `sin serve`; the app server's loopback URL inside
+// the desktop app) and carry the admin token when one was injected.
+import { apiHeaders, apiUrl } from "./runtime";
 import type { HardwareProfile, Recommendation, StatusResponse, Task } from "./types";
 
 export class ApiError extends Error {
@@ -15,7 +17,7 @@ export class ApiError extends Error {
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(path, { headers: { Accept: "application/json" }, signal });
+    res = await fetch(apiUrl(path), { headers: apiHeaders(), signal });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     throw new ApiError(`Could not reach the node at ${path}: ${detail}`, 0);
