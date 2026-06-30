@@ -53,6 +53,7 @@ def build_receipt(
     completed_at: datetime,
     response_hash: str,
     runtime_version: str | None = None,
+    request_hash: str | None = None,
 ) -> dict[str, Any]:
     """Build an unsigned receipt dict ready to pass to :func:`sign_receipt`."""
     receipt: dict[str, Any] = {
@@ -73,6 +74,8 @@ def build_receipt(
     }
     if runtime_version is not None:
         receipt["runtime_version"] = runtime_version
+    if request_hash is not None:
+        receipt["request_hash"] = request_hash
     return receipt
 
 

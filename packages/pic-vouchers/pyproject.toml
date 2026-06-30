@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "AGPL-3.0-or-later"
 authors = [{ name = "Joshua Warren" }]
-dependencies = ["sip-protocol"]
+dependencies = ["sip-protocol", "cryptography>=42"]
 
 [build-system]
 requires = ["hatchling"]

@@ -1,0 +1,22 @@
+[project]
+name = "sip-relay"
+version = "0.1.2"
+description = "A SIP-AI privacy relay: forwards inference requests to a provider so the provider never sees the client, while the client still verifies the provider's signed receipt."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "AGPL-3.0-or-later"
+authors = [{ name = "Joshua Warren" }]
+dependencies = ["sip-protocol", "fastapi>=0.110", "httpx>=0.27"]
+
+[project.scripts]
+sip-relay = "sip_relay.app:run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sip_relay"]
+
+[tool.uv.sources]
+sip-protocol = { workspace = true }

@@ -3,6 +3,30 @@
 A running log of what's done and what's next. See [ROADMAP.md](ROADMAP.md) for
 the phased plan and [CHANGELOG.md](CHANGELOG.md) for released changes.
 
+## 2026-06-30 — Phase 5: privacy modes + 3-machine validation
+
+**Live validation** — all of `main` (Phases 0–4 + share/discovery + supply) re-run
+on **laptop / macstudio / proxmox2** (fresh clone of commit 59858ca): full pytest
+exit 0 + all 5 demos green on macOS arm64 ×2 and Linux x86_64.
+
+**Phase 5 done** (branch `feat/phase-5-privacy`, PR pending)
+- **`sip-relay`** (AGPL, TDD): privacy relay — forward to a provider so it never
+  sees the client; routes only to the signed `manifest_uri`; untrusted for integrity
+  (client `relay_chat` verifies the receipt; tampering relay detected).
+- **TEE attestation** (`sip_protocol.attestation`, TDD): `sip-ai.attestation.v1`
+  build/sign/verify + `is_attested` policy (binds attestation to the manifest key);
+  hardware-quote verification is an injected boundary. New schema + manifest field.
+- **Issuer-unlinkable credits** (`sip_pic.blind`, TDD): RSA blind-signature credits
+  (blind → blind-sign → unblind → redeem; double-spend via spent-set). v0 = MGF1-FDH,
+  documented as pending formal review.
+- **`sip-privacy-demo`**: attested provider + unlinkable credit + relay (with a
+  threaded ASGI transport so relay→provider composes in-process).
+- 498 tests; ruff + mypy --strict clean. CI extended (pic-vouchers + relay in the
+  mypy list; privacy-demo smoke step). Adversarial review run (crypto-focused).
+
+**Next:** open PR; Phase 6 (production hardening) or deeper privacy (onion routing,
+formal crypto review, DCAP/SEV verifiers).
+
 ## 2026-06-30 — Supply follow-ons: hosted directory, reputation, auto re-announce
 
 **Done** (branch `feat/directory-service-reputation-reannounce`, PR pending)

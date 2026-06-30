@@ -60,10 +60,17 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ `sip-supply-demo`: hosted directory + reputation rank + re-announce, in-process
 - ⬜ Further: directory federation/gossip, signed reputation attestations, staking
 
-## Phase 5 — Privacy modes  (post-MVP)
-- ⬜ Relay hardening; Tor/Snowflake, I2P, and Nym-compatible transport experiments
-- ⬜ TEE-capable provider metadata & attestation
-- ⬜ PIC cryptographic upgrade (Chaumian ecash / Privacy Pass)
+## Phase 5 — Privacy modes  (post-MVP) — ✅ first slices landed
+- ✅ **Privacy relay** (`sip-relay`): forward to a provider so it never sees the
+  client; relay routes only to the signed `manifest_uri` and is untrusted for
+  integrity (client verifies the receipt). Single-hop today.
+- ✅ **TEE attestation** (`sip-ai.attestation.v1` + `is_attested`): signed statement
+  binding a TEE measurement to a provider key; hardware-quote check is pluggable.
+- ✅ **Issuer-unlinkable credits** (`sip_pic.blind`): RSA blind-signature credits
+  (v0, MGF1-FDH, pending formal review) — payer↔issuer unlinkability + double-spend.
+- ✅ `sip-privacy-demo`: attested provider + unlinkable credit + relay, in-process.
+- ⬜ Further: multi-hop onion routing + Tor/Snowflake/I2P/Nym transports, request
+  encryption, formal review of the blind-credit scheme, DCAP/SEV quote verifiers.
 
 ## Phase 6 — Production hardening  (post-hackathon)
 - ⬜ Security review & signed releases

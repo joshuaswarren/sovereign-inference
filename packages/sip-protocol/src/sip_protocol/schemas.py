@@ -24,6 +24,7 @@ SCHEMA_FILES: dict[str, str] = {
     "voucher": "inference_voucher.schema.json",
     "model_manifest": "model_manifest.schema.json",
     "provider_manifest": "provider_manifest.schema.json",
+    "attestation": "attestation.schema.json",
 }
 
 

@@ -7,6 +7,21 @@ follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
 ## [Unreleased]
 
 ### Added
+- **Phase 5 — privacy modes (relay, TEE attestation, issuer-unlinkable credits):**
+  - **`sip-relay`** (AGPL): a privacy relay that forwards a completion to a provider
+    so the provider sees the relay, not the client. The relay routes **only to the
+    signed `manifest_uri`** and is untrusted for integrity — the client (`relay_chat`)
+    verifies the provider's signed receipt and detects any tampering.
+  - **TEE attestation** (`sip_protocol.attestation`): a signed `sip-ai.attestation.v1`
+    statement binding a TEE type + code measurement to a provider key, embedded in the
+    provider manifest, with an `is_attested` selection policy (binds the attestation to
+    the manifest key; hardware-quote verification is a pluggable boundary).
+  - **Issuer-unlinkable credits** (`sip_pic.blind`): RSA blind-signature credits — the
+    issuer blind-signs a serial it never sees, so it can't link issuance to redemption
+    (payer↔issuer unlinkability), with double-spend prevention via the spent-set. (v0:
+    MGF1-FDH, documented as pending formal review.)
+  - **Privacy demo** (`sip-privacy-demo`): require an attested provider, mint + spend an
+    unlinkable credit, route through a relay, and detect a tampering relay — in-process.
 - **Supply onboarding follow-ons — hosted directory, reputation, auto re-announce:**
   - **Hosted directory service** — `sip_discovery.HttpDirectory` (a `Directory`
     client over HTTP) and **`sip-directory-service`** (an AGPL FastAPI relay,
