@@ -79,11 +79,14 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ **Policy framework** (`sip-policy`): attestation / price caps / privacy modes /
   allow-deny / min-reputation, applied by the proxy.
 - ✅ Provider reputation (`sip-reputation`, shipped in supply onboarding).
-- ⬜ Plugin SDK (entry-point extension points for adapters / providers / directories).
-- ⬜ Security review & signed releases (dependency audit, SBOM, signed artifacts).
-- ⬜ **Cross-platform desktop app (Tauri)** bundling the Python node as a sidecar
-  + the React dashboard, for one-click install on macOS/Linux/Windows by
-  non-technical users.
+- ✅ **Plugin SDK** (`sip-plugins`): entry-point extension points for runtime
+  adapters / compute providers / directories.
+- ✅ **Supply-chain hardening**: CI dependency audit (`pip-audit`) + CycloneDX SBOM
+  artifact + [`RELEASING.md`](RELEASING.md) (reproducible + signed releases).
+- 🚧 **Cross-platform desktop app (Tauri)**: scaffold landed (`apps/desktop`) —
+  bundles the dashboard + the OpenAI-proxy sidecar; the signed installer is built
+  with the local Rust/Tauri toolchain (one-click install on macOS/Linux/Windows).
+- ⬜ Remaining: built/notarized installers in release CI; an in-app onboarding flow.
 
 ## How to help
 Pick an unchecked item, open an issue if one doesn't exist, and see
