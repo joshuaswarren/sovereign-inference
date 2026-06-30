@@ -24,9 +24,11 @@ follow [Semantic Versioning](https://semver.org/) once it reaches 1.0.
   - **Supply-chain hardening**: a CI `security` job runs `pip-audit` over the locked
     dependency set (advisory) and publishes a CycloneDX **SBOM** artifact;
     [`RELEASING.md`](RELEASING.md) documents reproducible builds + signed releases.
-  - **Desktop app scaffold** (`apps/desktop`, Tauri v2): bundles the dashboard + the
-    OpenAI-proxy sidecar for one-click install; the signed installer is built with
-    the local Rust/Tauri toolchain.
+  - **Desktop app** (`apps/desktop`, Tauri v2): bundles the dashboard + the Python
+    OpenAI-proxy sidecar into a one-click app — **built + verified on macOS arm64**
+    (`.app` + `.dmg`; launches and serves `http://localhost:11435/v1`). Sidecar
+    permission via Tauri v2 `capabilities/`; Linux/Windows build the same way on
+    those platforms. Built binaries are git-ignored.
 - **Phase 5 — privacy modes (relay, TEE attestation, issuer-unlinkable credits):**
   - **`sip-relay`** (AGPL): a privacy relay that forwards a completion to a provider
     so the provider sees the relay, not the client. The relay routes **only to the

@@ -83,10 +83,11 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
   adapters / compute providers / directories.
 - ✅ **Supply-chain hardening**: CI dependency audit (`pip-audit`) + CycloneDX SBOM
   artifact + [`RELEASING.md`](RELEASING.md) (reproducible + signed releases).
-- 🚧 **Cross-platform desktop app (Tauri)**: scaffold landed (`apps/desktop`) —
-  bundles the dashboard + the OpenAI-proxy sidecar; the signed installer is built
-  with the local Rust/Tauri toolchain (one-click install on macOS/Linux/Windows).
-- ⬜ Remaining: built/notarized installers in release CI; an in-app onboarding flow.
+- ✅ **Cross-platform desktop app (Tauri)** (`apps/desktop`): bundles the dashboard +
+  the Python OpenAI-proxy sidecar; **built + verified on macOS arm64** (`.app` + `.dmg`;
+  launches and serves `http://localhost:11435/v1`). Linux/Windows build the same way
+  on those platforms.
+- ⬜ Remaining: notarized/signed installers in a release workflow; an in-app onboarding flow.
 
 ## How to help
 Pick an unchecked item, open an issue if one doesn't exist, and see

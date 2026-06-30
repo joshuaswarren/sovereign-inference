@@ -1,0 +1,11 @@
+# Tauri / Rust build output
+src-tauri/target/
+src-tauri/gen/
+
+# Bundled Python sidecar binaries (built locally per platform; do not commit the 25MB+ binary)
+src-tauri/binaries/
+
+# PyInstaller freeze workspace
+build/
+
+# Generated source icon staging (the committed icon set lives in src-tauri/icons/)
