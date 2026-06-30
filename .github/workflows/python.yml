@@ -58,7 +58,7 @@ jobs:
         run: uv run ruff check packages adapters apps
 
       - name: mypy (typed libraries)
-        run: uv run mypy packages/sip-protocol/src packages/receipt-verifier/src packages/sin-node/src packages/sin-cli/src packages/compute/src packages/arweave-anchor/src packages/discovery/src packages/reputation/src packages/pic-vouchers/src packages/policy/src packages/plugins/src adapters/runtime-ollama/src adapters/runtime-llamacpp/src adapters/provider-nosana/src adapters/provider-akash/src apps/router-demo/src apps/directory-service/src apps/relay/src apps/openai-proxy/src
+        run: uv run mypy packages/sip-protocol/src packages/receipt-verifier/src packages/sin-node/src packages/sin-cli/src packages/compute/src packages/arweave-anchor/src packages/discovery/src packages/reputation/src packages/pic-vouchers/src packages/policy/src packages/plugins/src packages/router/src adapters/runtime-ollama/src adapters/runtime-llamacpp/src adapters/provider-nosana/src adapters/provider-akash/src apps/router-demo/src apps/directory-service/src apps/relay/src apps/openai-proxy/src
 
       - name: Tests
         run: uv run pytest --cov --cov-report=term-missing

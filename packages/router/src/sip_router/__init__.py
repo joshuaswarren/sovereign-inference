@@ -22,6 +22,7 @@ from .models import ProviderEntry, RouteResult
 from .registry import ProviderRegistry
 from .resolver import resolve
 from .scoring import DEFAULT_WEIGHTS, rank_candidates, score_provider
+from .transport import ThreadedASGITransport, in_process_client
 
 __version__ = "0.1.2"
 
@@ -33,7 +34,9 @@ __all__ = [
     "RouteResult",
     "SovereignClient",
     "SovereignRouterError",
+    "ThreadedASGITransport",
     "__version__",
+    "in_process_client",
     "rank_candidates",
     "resolve",
     "score_provider",

@@ -1145,20 +1145,32 @@ source = { editable = "apps/openai-proxy" }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "sin-node" },
     { name = "sip-discovery" },
+    { name = "sip-pic" },
     { name = "sip-policy" },
     { name = "sip-protocol" },
+    { name = "sip-provider-gateway" },
     { name = "sip-router" },
+    { name = "sip-runtime-llamacpp" },
+    { name = "sip-runtime-ollama" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.110" },
     { name = "httpx", specifier = ">=0.27" },
+    { name = "sin-node", editable = "packages/sin-node" },
     { name = "sip-discovery", editable = "packages/discovery" },
+    { name = "sip-pic", editable = "packages/pic-vouchers" },
     { name = "sip-policy", editable = "packages/policy" },
     { name = "sip-protocol", editable = "packages/sip-protocol" },
+    { name = "sip-provider-gateway", editable = "packages/provider-gateway" },
     { name = "sip-router", editable = "packages/router" },
+    { name = "sip-runtime-llamacpp", editable = "adapters/runtime-llamacpp" },
+    { name = "sip-runtime-ollama", editable = "adapters/runtime-ollama" },
+    { name = "uvicorn", specifier = ">=0.30" },
 ]
 
 [[package]]

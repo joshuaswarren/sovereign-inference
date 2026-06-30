@@ -17,7 +17,7 @@ import hmac
 import json
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Annotated, Any
 
@@ -98,15 +98,20 @@ def _usage(receipt: dict[str, Any]) -> dict[str, int]:
     return {"prompt_tokens": prompt, "completion_tokens": completion, "total_tokens": prompt + completion}
 
 
-def create_proxy_app(
-    backend: ProxyBackend,
+def mount_proxy_routes(
+    app: FastAPI,
+    get_backend: Callable[[], ProxyBackend],
     *,
     api_key: str | None = None,
     default_max_tokens: int = _DEFAULT_MAX_TOKENS,
     wallet: sip_pic.Wallet | None = None,
-) -> FastAPI:
-    """Build the OpenAI-compatible FastAPI proxy over ``backend``."""
-    app = FastAPI(title="Sovereign Inference — OpenAI-compatible proxy")
+) -> None:
+    """Add the OpenAI surface (``/healthz``, ``/v1/*``) to ``app``.
+
+    ``get_backend`` is read on every request, so the routing backend can be
+    rebuilt live (e.g. when the user adds a provider during onboarding) without
+    rebuilding the app or restarting the server.
+    """
 
     @app.exception_handler(RequestValidationError)
     async def _on_validation_error(_request: Request, exc: RequestValidationError) -> JSONResponse:
@@ -123,13 +128,13 @@ def create_proxy_app(
 
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:
-        return {"status": "ok", "models": backend.models}
+        return {"status": "ok", "models": get_backend().models}
 
     @app.get("/v1/models")
     def list_models(authorization: Annotated[str | None, Header()] = None) -> JSONResponse:
         if not _authorized(authorization):
             return _error("missing or invalid API key", "unauthorized", 401)
-        data = [{"id": m, "object": "model", "created": 0, "owned_by": OWNER} for m in backend.models]
+        data = [{"id": m, "object": "model", "created": 0, "owned_by": OWNER} for m in get_backend().models]
         return JSONResponse({"object": "list", "data": data})
 
     @app.post("/v1/chat/completions")
@@ -138,7 +143,7 @@ def create_proxy_app(
             return _error("missing or invalid API key", "unauthorized", 401)
         messages = [{"role": m.role, "content": _text_of(m.content)} for m in req.messages]
         try:
-            result = backend.client.chat(
+            result = get_backend().client.chat(
                 req.model, messages, max_tokens=req.max_tokens or default_max_tokens, wallet=wallet
             )
         except NoProviderAvailable as exc:
@@ -174,6 +179,17 @@ def create_proxy_app(
             }
         )
 
+
+def create_proxy_app(
+    backend: ProxyBackend,
+    *,
+    api_key: str | None = None,
+    default_max_tokens: int = _DEFAULT_MAX_TOKENS,
+    wallet: sip_pic.Wallet | None = None,
+) -> FastAPI:
+    """Build the OpenAI-compatible FastAPI proxy over a fixed ``backend``."""
+    app = FastAPI(title="Sovereign Inference — OpenAI-compatible proxy")
+    mount_proxy_routes(app, lambda: backend, api_key=api_key, default_max_tokens=default_max_tokens, wallet=wallet)
     return app
 
 
