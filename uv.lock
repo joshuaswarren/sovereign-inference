@@ -24,6 +24,7 @@ members = [
     "sip-provider-gateway",
     "sip-provider-nosana",
     "sip-receipts",
+    "sip-relay",
     "sip-reputation",
     "sip-router",
     "sip-router-demo",
@@ -1139,11 +1140,15 @@ name = "sip-pic"
 version = "0.1.2"
 source = { editable = "packages/pic-vouchers" }
 dependencies = [
+    { name = "cryptography" },
     { name = "sip-protocol" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "sip-protocol", editable = "packages/sip-protocol" }]
+requires-dist = [
+    { name = "cryptography", specifier = ">=42" },
+    { name = "sip-protocol", editable = "packages/sip-protocol" },
+]
 
 [[package]]
 name = "sip-protocol"
@@ -1229,6 +1234,23 @@ dependencies = [
 requires-dist = [{ name = "sip-protocol", editable = "packages/sip-protocol" }]
 
 [[package]]
+name = "sip-relay"
+version = "0.1.2"
+source = { editable = "apps/relay" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "sip-protocol" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.110" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "sip-protocol", editable = "packages/sip-protocol" },
+]
+
+[[package]]
 name = "sip-reputation"
 version = "0.1.2"
 source = { editable = "packages/reputation" }
@@ -1280,6 +1302,7 @@ dependencies = [
     { name = "sip-provider-akash" },
     { name = "sip-provider-gateway" },
     { name = "sip-provider-nosana" },
+    { name = "sip-relay" },
     { name = "sip-reputation" },
     { name = "sip-router" },
 ]
@@ -1297,6 +1320,7 @@ requires-dist = [
     { name = "sip-provider-akash", editable = "adapters/provider-akash" },
     { name = "sip-provider-gateway", editable = "packages/provider-gateway" },
     { name = "sip-provider-nosana", editable = "adapters/provider-nosana" },
+    { name = "sip-relay", editable = "apps/relay" },
     { name = "sip-reputation", editable = "packages/reputation" },
     { name = "sip-router", editable = "packages/router" },
 ]

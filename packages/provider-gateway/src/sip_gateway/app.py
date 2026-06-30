@@ -31,6 +31,7 @@ from sip_protocol import (
     KeyPair,
     build_quote,
     build_receipt,
+    hash_request,
     hash_response_body,
     sign_provider_manifest,
     sign_quote,
@@ -362,6 +363,7 @@ def create_app(
                 started_at=started,
                 completed_at=completed,
                 response_hash=hash_response_body(result.content),
+                request_hash=hash_request(model, messages),
             ),
             keypair,
         )

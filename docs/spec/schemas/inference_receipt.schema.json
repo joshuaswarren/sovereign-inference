@@ -108,6 +108,11 @@
       "pattern": "^sha256:[0-9a-f]{64}$",
       "description": "SHA-256 hash of the canonical response body. Lets a client prove the response was not altered post-signing."
     },
+    "request_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Optional SHA-256 hash of the canonical request (model + messages). Lets a client prove the receipt corresponds to its request, e.g. when routing through an untrusted relay."
+    },
     "signature": {
       "type": "string",
       "pattern": "^ed25519:[A-Za-z0-9+/=_-]{86,88}$",

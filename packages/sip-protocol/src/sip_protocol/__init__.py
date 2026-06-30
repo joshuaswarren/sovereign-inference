@@ -12,6 +12,12 @@ Public API:
 
 from __future__ import annotations
 
+from .attestation import (
+    build_attestation,
+    is_attested,
+    sign_attestation,
+    verify_attestation,
+)
 from .canonical import canonical_json
 from .documents import sign_document, signing_bytes, verify_document
 from .errors import (
@@ -20,7 +26,7 @@ from .errors import (
     SignatureError,
     SIPProtocolError,
 )
-from .hashing import hash_response_body, sha256_prefixed
+from .hashing import hash_request, hash_response_body, sha256_prefixed
 from .manifests import (
     build_provider_manifest,
     model_manifest_hash,
@@ -76,6 +82,7 @@ __all__ = [
     "VerificationResult",
     "VoucherVerification",
     "__version__",
+    "build_attestation",
     "build_provider_manifest",
     "build_quote",
     "build_receipt",
@@ -83,7 +90,9 @@ __all__ = [
     "canonical_json",
     "decode_public_key",
     "encode_public_key",
+    "hash_request",
     "hash_response_body",
+    "is_attested",
     "iter_errors",
     "load_schema",
     "model_manifest_hash",
@@ -91,6 +100,7 @@ __all__ = [
     "quote_is_expired",
     "receipt_signing_bytes",
     "sha256_prefixed",
+    "sign_attestation",
     "sign_document",
     "sign_provider_manifest",
     "sign_quote",
@@ -100,6 +110,7 @@ __all__ = [
     "validate",
     "validate_model_manifest",
     "verify",
+    "verify_attestation",
     "verify_document",
     "verify_provider_manifest",
     "verify_quote",

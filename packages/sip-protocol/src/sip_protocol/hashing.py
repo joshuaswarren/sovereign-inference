@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 import hashlib
+from typing import Any
+
+from .canonical import canonical_json
 
 SHA256_PREFIX = "sha256:"
 
@@ -18,3 +21,13 @@ def hash_response_body(body: str | bytes) -> str:
     if isinstance(body, str):
         body = body.encode("utf-8")
     return sha256_prefixed(body)
+
+
+def hash_request(model: str, messages: list[dict[str, Any]]) -> str:
+    """Hash the canonical request (model + messages).
+
+    Embedded in a receipt as ``request_hash`` so a client can prove the signed
+    receipt corresponds to *its* request — defeating a relay that substitutes a
+    different (but genuinely signed) answer for another prompt.
+    """
+    return sha256_prefixed(canonical_json({"model": model, "messages": messages}))

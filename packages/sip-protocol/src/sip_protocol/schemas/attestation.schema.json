@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sovereign-inference.org/schemas/attestation.schema.json",
+  "title": "SIP-AI TEE Attestation Statement",
+  "description": "A signed statement binding a TEE type and code measurement to a provider's public key. The optional quote_ref points to a raw hardware attestation quote (e.g. Intel DCAP) whose verification is performed by a separate, pluggable verifier.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "provider_pubkey", "tee_type", "measurement", "issued_at", "signature"],
+  "properties": {
+    "schema": { "type": "string", "const": "sip-ai.attestation.v1" },
+    "provider_pubkey": { "type": "string", "pattern": "^ed25519:[A-Za-z0-9+/=_-]{43,46}$" },
+    "tee_type": { "type": "string", "enum": ["intel-tdx", "amd-sev-snp", "nvidia-cc", "aws-nitro", "none"] },
+    "measurement": { "type": "string", "description": "Hash/identifier of the attested code or enclave, e.g. sha256:..." },
+    "quote_ref": { "type": "string", "description": "Optional reference (URI/anchor) to the raw hardware attestation quote." },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "signature": { "type": "string", "pattern": "^ed25519:[A-Za-z0-9+/=_-]{86,88}$" }
+  }
+}

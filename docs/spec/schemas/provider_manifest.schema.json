@@ -79,6 +79,10 @@
       "type": "string",
       "description": "Optional reference to a TEE attestation document (e.g. Intel TDX quote)."
     },
+    "attestation": {
+      "type": "object",
+      "description": "Optional embedded signed sip-ai.attestation.v1 statement binding a TEE measurement to this provider key."
+    },
     "manifest_uri": { "type": "string" },
     "published_at": { "type": "string", "format": "date-time" },
     "signature": {
