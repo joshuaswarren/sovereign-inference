@@ -280,3 +280,38 @@ def test_cli_benchmark_announce_bad_key_returns_1(monkeypatch: object) -> None:
             ]
         )
         assert code == 1  # a bad key surfaces as a clean exit 1, not a traceback
+
+
+# -- persistent shared double-spend guard (issue #24) -------------------------
+
+
+def test_share_uses_persistent_spent_set(tmp_path: Path) -> None:
+    # A spent_set_path must yield a gateway whose double-spend guard survives a
+    # full rebuild: the same PIC voucher, replayed against a fresh gateway built
+    # on the same path, is rejected (the spend log persisted and was shared).
+    kp = KeyPair.generate()
+    issuer = sip_pic.Issuer(KeyPair.generate(), unit="pic")
+    db = str(tmp_path / "s.db")
+    # input_per_1m=1e6 -> a 2-word prompt prices at exactly "2" in unit "pic".
+    config = _config(
+        require_payment=True,
+        pic_issuers=(issuer.pubkey,),
+        pricing_unit="pic",
+        input_per_1m=1000000.0,
+        spent_set_path=db,
+    )
+    prompt = {"role": "user", "content": "ping pong"}
+    wallet = sip_pic.Wallet(issuer.issue("2", count=1))
+    payment = sip_pic.build_pic_payment(wallet.select("2", "pic"))
+    body = {"model": MODEL, "messages": [prompt], "max_tokens": 16, "sip_payment": payment}
+
+    # First gateway: the paid request succeeds and records the voucher id spent.
+    first = build_share(config, keypair=kp, adapter=MockAdapter())
+    resp = TestClient(first.app).post("/v1/chat/completions", json=body)
+    assert resp.status_code == 200, resp.text
+
+    # Fresh gateway on the SAME path: replaying the identical voucher is blocked.
+    second = build_share(config, keypair=kp, adapter=MockAdapter())
+    replay = TestClient(second.app).post("/v1/chat/completions", json=body)
+    assert replay.status_code == 402
+    assert replay.json()["error"] == "payment required"
