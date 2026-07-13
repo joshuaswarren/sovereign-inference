@@ -21,8 +21,11 @@ Protocol (textbook RSA blind signatures with an MGF1 full-domain hash):
 protocol are real and tested. The FDH here is MGF1-over-SHA-256, which is a
 reasonable full-domain hash but this scheme has **not had formal review**; treat
 it as a v0 of the unlinkable-credit path, not yet a drop-in for the audited PIC
-voucher flow. Denomination is bound by the issuer key + the credit's declared
-``amount``; production should use one issuer key per denomination.
+voucher flow. Denomination (``amount``/``unit``) is bound **into the signed
+message** — folded into the FDH preimage alongside the serial — so the issuer's
+signature covers the value, and any post-issuance mutation of the denomination
+invalidates the signature. Using one issuer key per denomination is an optional
+additional hardening, not required for value integrity.
 """
 
 from __future__ import annotations
@@ -124,9 +127,29 @@ def _mgf1(seed: bytes, length: int) -> bytes:
     return bytes(out[:length])
 
 
-def _fdh(token: bytes, key: BlindIssuerKey) -> int:
-    """Full-domain hash of ``token`` into Z_n via MGF1-over-SHA-256."""
-    digest = _mgf1(b"sip-blind-fdh:" + token, key.key_bytes())
+def _denomination_bytes(amount: str, unit: str) -> bytes:
+    """Unambiguous, length-prefixed encoding of a credit's denomination.
+
+    Length-prefixing prevents field-confusion (e.g. amount="1"+unit="0PIC"
+    hashing the same as amount="10"+unit="PIC") and keeps distinct values
+    distinct. Encoded exactly as the strings that live on the credit, so the
+    issuer signs, and the redeemer checks, byte-for-byte the same value.
+    """
+    a = amount.encode("utf-8")
+    u = unit.encode("utf-8")
+    return len(a).to_bytes(4, "big") + a + len(u).to_bytes(4, "big") + u
+
+
+def _fdh(token: bytes, amount: str, unit: str, key: BlindIssuerKey) -> int:
+    """Full-domain hash of ``(serial, amount, unit)`` into Z_n via MGF1-over-SHA-256.
+
+    Binding amount||unit into the preimage means the issuer's signature covers
+    the denomination: mutating amount or unit after issuance changes m, so
+    verification fails. The domain tag is bumped to sip-blind-fdh-v2 so a v1
+    (value-unbound) signature can never satisfy a v2 verification and vice versa.
+    """
+    preimage = b"sip-blind-fdh-v2:" + token + _denomination_bytes(amount, unit)
+    digest = _mgf1(preimage, key.key_bytes())
     return int.from_bytes(digest, "big") % key.n
 
 
@@ -138,9 +161,20 @@ def _random_unit(n: int, rng: RngBytes) -> int:
             return r
 
 
-def blind(token: bytes, key: BlindIssuerKey, *, rng: RngBytes = secrets.token_bytes) -> tuple[int, int]:
-    """Blind ``token`` for ``key``; return ``(blinded_message, blinding_factor)``."""
-    m = _fdh(token, key)
+def blind(
+    token: bytes,
+    amount: str,
+    unit: str,
+    key: BlindIssuerKey,
+    *,
+    rng: RngBytes = secrets.token_bytes,
+) -> tuple[int, int]:
+    """Blind ``token`` for ``key``; return ``(blinded_message, blinding_factor)``.
+
+    The denomination (``amount``, ``unit``) is folded into the FDH preimage so
+    the issuer's blind signature covers the value, not just the serial.
+    """
+    m = _fdh(token, amount, unit, key)
     r = _random_unit(key.n, rng)
     blinded = (m * pow(r, key.e, key.n)) % key.n
     return blinded, r
@@ -152,9 +186,9 @@ def unblind(blinded_sig: int, r: int, key: BlindIssuerKey) -> int:
     return (blinded_sig * r_inv) % key.n
 
 
-def verify_blind_token(token: bytes, sig: int, key: BlindIssuerKey) -> bool:
-    """True if ``sig`` is a valid issuer signature over ``token``."""
-    return pow(sig, key.e, key.n) == _fdh(token, key)
+def verify_blind_token(token: bytes, amount: str, unit: str, sig: int, key: BlindIssuerKey) -> bool:
+    """True if ``sig`` is a valid issuer signature over ``(token, amount, unit)``."""
+    return pow(sig, key.e, key.n) == _fdh(token, amount, unit, key)
 
 
 # -- the unlinkable credit flow -------------------------------------------------
@@ -201,7 +235,7 @@ def blind_credit_request(
 ) -> tuple[BlindCreditRequest, BlindingSecret]:
     """Client side: pick a random serial and blind it for ``key``."""
     token = rng(_SERIAL_BYTES)
-    blinded, r = blind(token, key, rng=rng)
+    blinded, r = blind(token, amount, unit, key, rng=rng)
     request = BlindCreditRequest(blinded=blinded, unit=unit, amount=amount, issuer=key.pubkey_str())
     secret = BlindingSecret(token=token, r=r, unit=unit, amount=amount, key=key)
     return request, secret
@@ -220,14 +254,14 @@ def finalize_blind_credit(blinded_sig: int, secret: BlindingSecret) -> BlindCred
 
 
 def verify_blind_credit(credit: BlindCredit) -> bool:
-    """True if the credit carries a valid issuer signature over its serial."""
+    """True if the credit carries a valid issuer signature over its serial AND denomination (amount/unit)."""
     try:
         key = BlindIssuerKey.from_str(credit.issuer)
         token = _b64u_decode(credit.token)
         sig = _b64u_to_int(credit.signature)
     except (ValueError, TypeError):
         return False
-    return verify_blind_token(token, sig, key)
+    return verify_blind_token(token, credit.amount, credit.unit, sig, key)
 
 
 def redeem_blind_credit(
