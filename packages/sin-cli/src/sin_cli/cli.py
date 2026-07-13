@@ -189,6 +189,7 @@ def cmd_share(args: argparse.Namespace) -> int:
         output_per_1m=args.output_per_1m,
         require_payment=args.require_payment,
         pic_issuers=tuple(args.pic_issuer or ()),
+        spent_set_path=args.spent_set,
     )
     result = build_share(config, keypair=keypair, adapter=adapter)
 
@@ -372,6 +373,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_share.add_argument("--output-per-1m", type=float, default=0.0, help="price per 1M output tokens")
     p_share.add_argument("--require-payment", action="store_true", help="require PIC payment for completions")
     p_share.add_argument("--pic-issuer", action="append", help="accepted PIC issuer pubkey (repeatable)")
+    p_share.add_argument(
+        "--spent-set",
+        help="path to a shared, persistent SQLite spend log (required for multi-worker payment)",
+    )
     p_share.add_argument("--key-file", help="sip-receipt keygen JSON for a stable provider identity")
     p_share.add_argument("--manifest-out", help="write the signed provider manifest to this path")
     p_share.add_argument("--directory", help="announce the manifest to this directory file")

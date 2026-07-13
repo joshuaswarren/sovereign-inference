@@ -21,6 +21,7 @@ from typing import Any
 
 from sip_discovery import Directory
 from sip_gateway import create_app
+from sip_pic import SpentSet
 from sip_protocol import KeyPair, build_provider_manifest, sign_provider_manifest
 
 DEFAULT_RUNTIME = "ollama"
@@ -60,6 +61,10 @@ class ShareConfig:
     output_per_1m: float = 0.0
     require_payment: bool = False
     pic_issuers: tuple[str, ...] = field(default_factory=tuple)
+    # persistent, shared double-spend guard. When set, all workers/containers
+    # sharing the file see one atomic spend history; None keeps it in-memory
+    # (per-process) for backward compatibility.
+    spent_set_path: str | None = None
     # advertised performance (e.g. from `sin benchmark`), embedded in the manifest
     benchmark: dict[str, Any] | None = None
 
@@ -121,6 +126,10 @@ def build_share(
     """
     base_url = config.public_url()
     manifest = build_share_manifest(config, keypair=keypair, runtime_name=adapter.name, now=now)
+    # A shared, file-backed double-spend guard so x402 nonces and voucher ids
+    # cannot be replayed across workers or after a restart. None keeps the
+    # per-process default (backward compatible).
+    spent_set = SpentSet(config.spent_set_path) if config.spent_set_path else None
     app = create_app(
         adapter=adapter,
         keypair=keypair,
@@ -136,6 +145,7 @@ def build_share(
         provider_manifest=manifest,
         require_payment=config.require_payment,
         pic_issuers=list(config.pic_issuers),
+        spent_set=spent_set,
     )
     return ShareResult(app=app, manifest=manifest, base_url=base_url)
 
