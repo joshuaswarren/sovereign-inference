@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from sip_pic import SpentSet
@@ -33,10 +35,10 @@ def test_blind_unblind_round_trip_verifies() -> None:
     issuer = _issuer()
     key = issuer.public
     token = b"a-random-serial-number"
-    blinded, r = blind(token, key)
+    blinded, r = blind(token, "0.10", "pic", key)
     blinded_sig = issuer.sign_blinded(blinded)
     sig = unblind(blinded_sig, r, key)
-    assert verify_blind_token(token, sig, key) is True
+    assert verify_blind_token(token, "0.10", "pic", sig, key) is True
 
 
 def test_blinding_is_unlinkable_same_token_differs() -> None:
@@ -44,24 +46,24 @@ def test_blinding_is_unlinkable_same_token_differs() -> None:
     # yields different blinded messages, so the issuer cannot recognize a token.
     key = _issuer().public
     token = b"same-token"
-    b1, _ = blind(token, key)
-    b2, _ = blind(token, key)
+    b1, _ = blind(token, "0.10", "pic", key)
+    b2, _ = blind(token, "0.10", "pic", key)
     assert b1 != b2
     assert b1 != int.from_bytes(token, "big")
 
 
 def test_forged_signature_is_rejected() -> None:
     key = _issuer().public
-    assert verify_blind_token(b"token", 12345, key) is False
+    assert verify_blind_token(b"token", "0.10", "pic", 12345, key) is False
 
 
 def test_signature_from_other_issuer_is_rejected() -> None:
     issuer_a, issuer_b = _issuer(), _issuer()
     token = b"token"
-    blinded, r = blind(token, issuer_a.public)
+    blinded, r = blind(token, "0.10", "pic", issuer_a.public)
     sig = unblind(issuer_a.sign_blinded(blinded), r, issuer_a.public)
-    assert verify_blind_token(token, sig, issuer_a.public) is True
-    assert verify_blind_token(token, sig, issuer_b.public) is False
+    assert verify_blind_token(token, "0.10", "pic", sig, issuer_a.public) is True
+    assert verify_blind_token(token, "0.10", "pic", sig, issuer_b.public) is False
 
 
 # -- issuer key serialization ---------------------------------------------------
@@ -142,6 +144,116 @@ def test_redeem_rejects_forged_credit() -> None:
     )
     assert result.ok is False
     assert result.reason == "bad_signature"
+
+
+# -- regression: denomination must be covered by the issuer signature (#23) ----
+
+
+def test_mutating_amount_fails_verification() -> None:
+    """A credit's amount is bound into the issuer signature; rewriting it must
+    invalidate verification. (Regression for the denomination-forgery bug.)"""
+    issuer = _issuer()
+    key = issuer.public
+    request, secret = blind_credit_request(key, unit="PIC", amount="1")
+    credit = finalize_blind_credit(issuer.sign_blinded(request.blinded), secret)
+    forged = replace(credit, amount="1000000")
+    assert verify_blind_credit(forged) is False
+
+
+def test_mutating_amount_fails_redemption() -> None:
+    """A forged-amount credit must be rejected at redemption as bad_signature,
+    not redeemed for the forged value."""
+    issuer = _issuer()
+    key = issuer.public
+    request, secret = blind_credit_request(key, unit="PIC", amount="1")
+    credit = finalize_blind_credit(issuer.sign_blinded(request.blinded), secret)
+    forged = replace(credit, amount="1000000")
+    result = redeem_blind_credit(
+        forged,
+        price="1000000",
+        unit="PIC",
+        issuer_keys=[key.pubkey_str()],
+        spent_set=SpentSet(),
+    )
+    assert result.ok is False
+    assert result.reason == "bad_signature"
+
+
+def test_mutating_unit_fails_verification() -> None:
+    """Rewriting the unit must also invalidate verification."""
+    issuer = _issuer()
+    key = issuer.public
+    request, secret = blind_credit_request(key, unit="PIC", amount="1")
+    credit = finalize_blind_credit(issuer.sign_blinded(request.blinded), secret)
+    forged = replace(credit, unit="GOLD")
+    assert verify_blind_credit(forged) is False
+
+
+def test_unmodified_credit_still_verifies_and_redeems() -> None:
+    """Happy path: a legitimately-issued credit still verifies and redeems
+    (guards against over-tightening the denomination binding)."""
+    issuer = _issuer()
+    key = issuer.public
+    request, secret = blind_credit_request(key, unit="pic", amount="0.10")
+    credit = finalize_blind_credit(issuer.sign_blinded(request.blinded), secret)
+    assert verify_blind_credit(credit) is True
+    result = redeem_blind_credit(
+        credit,
+        price="0.10",
+        unit="pic",
+        issuer_keys=[key.pubkey_str()],
+        spent_set=SpentSet(),
+    )
+    assert result.ok is True
+    assert result.total == "0.10"
+
+
+def test_amount_denomination_binding_is_field_confusion_safe() -> None:
+    """Length-prefixed encoding defeats field confusion: a credit with
+    amount="1", unit="0PIC" must not be confusable with amount="10", unit="PIC".
+    Cross-assigning the denomination via replace must fail verification."""
+    issuer = _issuer()
+    key = issuer.public
+
+    req_a, secret_a = blind_credit_request(key, unit="0PIC", amount="1")
+    credit_a = finalize_blind_credit(issuer.sign_blinded(req_a.blinded), secret_a)
+
+    req_b, secret_b = blind_credit_request(key, unit="PIC", amount="10")
+    credit_b = finalize_blind_credit(issuer.sign_blinded(req_b.blinded), secret_b)
+
+    # Each verifies on its own.
+    assert verify_blind_credit(credit_a) is True
+    assert verify_blind_credit(credit_b) is True
+
+    # Cross-assign: credit_a's signature with credit_b's denomination.
+    confused_ab = replace(credit_a, amount=credit_b.amount, unit=credit_b.unit)
+    assert verify_blind_credit(confused_ab) is False
+
+    # And the reverse.
+    confused_ba = replace(credit_b, amount=credit_a.amount, unit=credit_a.unit)
+    assert verify_blind_credit(confused_ba) is False
+
+
+def test_unicode_unit_round_trips() -> None:
+    """A non-ASCII unit label must round-trip through issue/verify/redeem, and
+    mutating it must fail verification (UTF-8 byte-length is what is signed)."""
+    issuer = _issuer()
+    key = issuer.public
+    request, secret = blind_credit_request(key, unit="\u03c0-credit", amount="1")
+    credit = finalize_blind_credit(issuer.sign_blinded(request.blinded), secret)
+    assert verify_blind_credit(credit) is True
+    result = redeem_blind_credit(
+        credit,
+        price="1",
+        unit="\u03c0-credit",
+        issuer_keys=[key.pubkey_str()],
+        spent_set=SpentSet(),
+    )
+    assert result.ok is True
+    assert result.total == "1"
+
+    forged = replace(credit, unit="\u03c0-CREDIT")
+    assert verify_blind_credit(forged) is False
 
 
 # -- robustness: degenerate / malformed issuer keys -----------------------------
