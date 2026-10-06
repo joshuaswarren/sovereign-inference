@@ -2,6 +2,8 @@
 
 # Sovereign Inference
 
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink)](https://github.com/sponsors/joshuaswarren)
+
 **Run the best open model your hardware can handle — and optionally share that
 capacity through a privacy-preserving, censorship-resistant, provider-neutral
 inference network.**
@@ -155,6 +157,14 @@ Sovereign Inference is being entered into the
 implementation, originality, impact, and **verifiable evidence** (mockups are
 ineligible). Our plan, evidence map, and article series live in
 [docs/hackathon/](docs/hackathon/decentralizeai-submission.md).
+
+## Support
+
+Every bit of support helps keep sovereign-inference alive and free. If you are able, [sponsor on GitHub](https://github.com/sponsors/joshuaswarren) or send a Lightning donation to `joshuaswarren@strike.me` to directly fund continued development and new integrations.
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?style=for-the-badge)](https://github.com/sponsors/joshuaswarren)
+
+If financial support is not an option, you can still make a big difference: [star the repo](https://github.com/joshuaswarren/sovereign-inference), share it, or recommend it to a colleague. Word of mouth is how most people find sovereign-inference.
 
 ## Contributing
 
