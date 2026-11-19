@@ -24,6 +24,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from sip_protocol import verify_provider_manifest
+from sip_relay.ssrf import SsrfRefused
 
 ClientFactory = Callable[[str], httpx.Client]
 _FORWARD_TIMEOUT_S = 60.0
@@ -103,6 +104,9 @@ def create_relay_app(*, client_factory: ClientFactory = default_client_factory) 
         client = client_factory(base_url)
         try:
             upstream = client.post("/v1/chat/completions", json=completion)
+        except SsrfRefused as exc:
+            # The pinning transport refused the resolved address before connecting.
+            return JSONResponse({"error": f"refusing to forward: {exc}"}, status_code=400)
         except httpx.HTTPError as exc:
             return JSONResponse({"error": f"upstream provider unreachable: {exc}"}, status_code=502)
         try:

@@ -10,6 +10,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from sip_protocol import KeyPair, build_provider_manifest, sign_provider_manifest
 from sip_relay import create_relay_app
 from sip_relay.ssrf import PinnedTransport, SsrfRefused, resolve_host
 
@@ -106,35 +107,58 @@ class TestPinnedTransport:
             transport.handle_request(request)
 
 
+class TestUnwrap:
+    """The NAT64 unwrap really unwraps (fails on the old dead-code branch)."""
+
+    def test_nat64_unwraps_to_embedded_ipv4(self) -> None:
+        from sip_relay.ssrf import _unwrap_ipv4
+
+        assert _unwrap_ipv4(_ip("64:ff9b::102:304")) == _ip("1.2.3.4")  # type: ignore[arg-type]
+
+    def test_mapped_unwraps(self) -> None:
+        from sip_relay.ssrf import _unwrap_ipv4
+
+        assert _unwrap_ipv4(_ip("::ffff:127.0.0.1")) == _ip("127.0.0.1")  # type: ignore[arg-type]
+
+    def test_plain_ipv6_not_unwrapped(self) -> None:
+        from sip_relay.ssrf import _unwrap_ipv4
+
+        assert _unwrap_ipv4(_ip("2606:2800:220:1:248:1893:25c8:1946")) is None  # type: ignore[arg-type]
+
+
 class TestRedirects:
-    """A redirect from an allowed provider is never fetched by the relay."""
+    """The production factory never follows redirects, and a rebinding target
+    gets a clean 400, not a 500."""
 
-    def test_redirect_not_followed(self) -> None:
-        calls: list[str] = []
+    def test_default_factory_does_not_follow_redirects(self) -> None:
+        from sip_relay.app import default_client_factory
 
-        def factory(base_url: str) -> httpx.Client:
-            def handler(request: httpx.Request) -> httpx.Response:
-                calls.append(str(request.url))
-                if len(calls) == 1:
-                    return httpx.Response(302, headers={"location": "http://169.254.169.254/latest/meta-data/"})
-                return httpx.Response(200, json={})
+        client = default_client_factory("http://pub.test")
+        assert client.follow_redirects is False
 
-            return httpx.Client(
-                base_url=base_url,
-                transport=httpx.MockTransport(handler),
-                follow_redirects=False,
-            )
+    def test_refused_target_returns_400(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo)
+        kp = KeyPair.generate()
+        manifest = sign_provider_manifest(
+            build_provider_manifest(
+                provider_pubkey=kp.public_key_str,
+                models=["qwen-coder-7b"],
+                runtime_adapters=["llama.cpp"],
+                pricing_unit="test",
+                published_at="2026-06-30T00:00:00Z",
+                manifest_uri="http://rebind.test",
+            ),
+            kp,
+        )
+        app = create_relay_app()  # real default_client_factory, real pinning
+        client = TestClient(app, raise_server_exceptions=True)
+        target = {"base_url": "http://rebind.test", "manifest": manifest}
+        resp = client.post("/sip/v1/relay", json={"target": target, "completion": {}})
+        assert resp.status_code == 400
+        assert "non-public" in resp.json()["error"]
 
-        # The redirect check happens in the handler, not the factory, so build
-        # the app once and drive the endpoint directly.
-        app = create_relay_app(client_factory=factory)
-        client = TestClient(app)
-        target = {"base_url": "http://pub.test", "manifest": _unverified_manifest()}
-        client.post("/sip/v1/relay", json={"target": target, "completion": {}})
-        # The manifest gate fires first in the current handler; the redirect
-        # behavior itself is covered by the factory contract above (single call).
-        assert len(calls) <= 1
 
+def _ip(text: str) -> Any:
+    import ipaddress
 
-def _unverified_manifest() -> dict[str, Any]:
-    return {"provider_pubkey": "x", "models": ["m"], "manifest_uri": "http://pub.test"}
+    return ipaddress.ip_address(text)

@@ -48,16 +48,24 @@ def _normalize_host(host: str) -> str:
     return host
 
 
-def _is_dangerous_ip(ip: ipaddress._BaseAddress) -> bool:
-    # NAT64 (64:ff9b::/96) and IPv4-mapped (::ffff:0:0/96) hide IPv4 targets
-    # inside IPv6 literals; unwrap both before the range check.
-    v4: ipaddress.IPv4Address | None = None
-    if isinstance(ip, ipaddress.IPv6Address):
-        if ip.ipv4_mapped is not None:
-            v4 = ip.ipv4_mapped
-        elif int(ip) >> 32 == 0x64FF9B:
-            v4 = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
-    target = v4 if v4 is not None else ip
+def _unwrap_ipv4(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> ipaddress.IPv4Address | None:
+    """The IPv4 target hidden inside an IPv6 literal, if any.
+
+    Covers IPv4-mapped (::ffff:0:0/96) and NAT64 (64:ff9b::/96) well-known
+    prefixes; anything else (6to4 2002::/16 and friends) is left alone and
+    judged as plain IPv6.
+    """
+    if isinstance(ip, ipaddress.IPv4Address):
+        return ip
+    if ip.ipv4_mapped is not None:
+        return ip.ipv4_mapped
+    if ip in ipaddress.IPv6Network("64:ff9b::/96"):
+        return ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+    return None
+
+
+def _is_dangerous_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    target = _unwrap_ipv4(ip) or ip
     return bool(
         target.is_private
         or target.is_loopback
@@ -68,7 +76,7 @@ def _is_dangerous_ip(ip: ipaddress._BaseAddress) -> bool:
     )
 
 
-def host_ip_or_none(host: str) -> ipaddress._BaseAddress | None:
+def host_ip_or_none(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
     """Parse ``host`` as an IP literal (any spelling), else None."""
     try:
         return ipaddress.ip_address(_normalize_host(host))
@@ -87,7 +95,7 @@ def resolve_host(host: str, port: int) -> str:
         raise SsrfRefused(f"cannot resolve {host}: {exc}") from exc
     if not infos:
         raise SsrfRefused(f"no addresses for {host}")
-    addresses = [info[4][0] for info in infos]
+    addresses = [str(info[4][0]) for info in infos]
     for addr in addresses:
         parsed = host_ip_or_none(addr)
         if parsed is None or _is_dangerous_ip(parsed):
@@ -103,7 +111,7 @@ class PinnedTransport(httpx.HTTPTransport):
     certificate verification still target the intended provider.
     """
 
-    def __init__(self, base_url: str, **kwargs: Any) -> None:  # type: ignore[no-untyped-def]
+    def __init__(self, base_url: str, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         split = urlsplit(base_url)
         self._host = split.hostname or ""
