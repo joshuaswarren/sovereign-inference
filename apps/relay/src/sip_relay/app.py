@@ -15,7 +15,6 @@ both response and request — lets the client detect tampering and substitution.
 from __future__ import annotations
 
 import argparse
-import ipaddress
 from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlsplit
@@ -25,6 +24,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from sip_protocol import verify_provider_manifest
+from sip_relay.ssrf import SsrfRefused
 
 ClientFactory = Callable[[str], httpx.Client]
 _FORWARD_TIMEOUT_S = 60.0
@@ -49,18 +49,26 @@ def _is_safe_forward_url(base_url: str) -> bool:
     lowered = host.lower()
     if lowered in _BLOCKED_HOSTNAMES or lowered.endswith(".localhost"):
         return False
-    try:
-        ip = ipaddress.ip_address(host)
-    except ValueError:
-        return True  # a non-literal hostname; allowed at this layer
-    return not (
-        ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified
-    )
+    # IP literals in any spelling (decimal/octal/hex/NAT64/mapped) are
+    # classified here; hostnames are resolved and pinned in PinnedTransport.
+    from sip_relay.ssrf import _is_dangerous_ip, host_ip_or_none
+
+    ip = host_ip_or_none(host)
+    if ip is not None:
+        return not _is_dangerous_ip(ip)
+    return True
 
 
 def default_client_factory(base_url: str) -> httpx.Client:
-    """Production factory: an httpx client bound to the provider's base URL."""
-    return httpx.Client(base_url=base_url, timeout=_FORWARD_TIMEOUT_S)
+    """Production factory: resolve once, pin the connection, never follow redirects."""
+    from sip_relay.ssrf import PinnedTransport
+
+    return httpx.Client(
+        base_url=base_url,
+        transport=PinnedTransport(base_url),
+        timeout=_FORWARD_TIMEOUT_S,
+        follow_redirects=False,
+    )
 
 
 def create_relay_app(*, client_factory: ClientFactory = default_client_factory) -> FastAPI:
@@ -96,6 +104,9 @@ def create_relay_app(*, client_factory: ClientFactory = default_client_factory) 
         client = client_factory(base_url)
         try:
             upstream = client.post("/v1/chat/completions", json=completion)
+        except SsrfRefused as exc:
+            # The pinning transport refused the resolved address before connecting.
+            return JSONResponse({"error": f"refusing to forward: {exc}"}, status_code=400)
         except httpx.HTTPError as exc:
             return JSONResponse({"error": f"upstream provider unreachable: {exc}"}, status_code=502)
         try:
