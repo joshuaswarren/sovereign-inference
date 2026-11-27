@@ -7,12 +7,14 @@ native API at the root (``/api/version``, ``/api/tags``, ``/api/pull``) used for
 detection, model listing, and pulling.
 
 Every external call (HTTP and ``shutil.which``) is injectable so unit tests run
-without a real Ollama install, and every failure degrades to empty/unknown
-rather than crashing the caller.
+without a real Ollama install. Read-only probes (detection, model listing)
+degrade to empty/unknown on failure; :meth:`OllamaAdapter.pull` changes state,
+so it fails closed and raises :class:`OllamaPullError` instead.
 """
 
 from __future__ import annotations
 
+import json
 import shutil
 from collections.abc import Callable
 from typing import Any
@@ -40,6 +42,40 @@ _PULL_CONNECT_TIMEOUT_S = 10.0
 def _pull_client() -> httpx.Client:
     """Client for streaming pulls: no total deadline, but finite read/connect."""
     return httpx.Client(timeout=httpx.Timeout(None, read=_PULL_READ_TIMEOUT_S, connect=_PULL_CONNECT_TIMEOUT_S))
+
+
+class OllamaPullError(RuntimeError):
+    """Raised when an Ollama model pull does not complete successfully.
+
+    Carries the model name and a human-readable reason so the CLI can print a
+    clear, actionable failure instead of falsely reporting success.
+    """
+
+    def __init__(self, model: str, reason: str) -> None:
+        self.model = model
+        self.reason = reason
+        super().__init__(f"failed to pull {model!r} via ollama: {reason}")
+
+
+def _read_error_detail(response: httpx.Response) -> str:
+    """Best-effort ``" - <server message>"`` suffix from an error response body."""
+    try:
+        response.read()
+        body = response.json()
+    except (httpx.HTTPError, ValueError):
+        return ""
+    if isinstance(body, dict) and body.get("error"):
+        return f" - {body['error']}"
+    return ""
+
+
+def _model_installed(model: str, tags: list[str]) -> bool:
+    """True if ``model`` (bare or tagged) is among the ``/api/tags`` names.
+
+    Ollama stores a bare name such as ``llama3.2`` as ``llama3.2:latest``.
+    """
+    wanted = model if ":" in model else f"{model}:latest"
+    return any(tag in (model, wanted) for tag in tags)
 
 
 class OllamaAdapter(OpenAICompatibleAdapter):
@@ -107,27 +143,44 @@ class OllamaAdapter(OpenAICompatibleAdapter):
                 client.close()
 
     def pull(self, model: str) -> None:
-        """Pull a model via ``/api/pull``, consuming the progress stream.
+        """Pull a model via ``/api/pull``, then verify it is installed.
 
-        Failures degrade silently; callers verify availability separately.
+        Fails closed: raises :class:`OllamaPullError` on a transport error, a
+        non-2xx status, an in-band ``{"error": ...}`` object in the progress
+        stream, or if the model is missing from ``/api/tags`` afterwards.
         """
         owns = self._client is None
         client = self._client or _pull_client()
+        stream_error: str | None = None
         try:
             with client.stream(
                 "POST",
                 f"{self.base_url}/api/pull",
                 json={"name": model, "stream": True},
             ) as response:
-                response.raise_for_status()
-                for _ in response.iter_lines():
-                    # Drain the NDJSON progress stream until the pull completes.
-                    pass
-        except httpx.HTTPError:
-            return
+                if response.status_code >= 400:
+                    detail = _read_error_detail(response)
+                    raise OllamaPullError(model, f"HTTP {response.status_code} from /api/pull{detail}")
+                # Ollama reports some pull failures inside a 200 NDJSON stream.
+                for line in response.iter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        event = json.loads(line)
+                    except ValueError:
+                        continue
+                    if isinstance(event, dict) and event.get("error"):
+                        stream_error = str(event["error"])
+        except httpx.HTTPError as exc:
+            raise OllamaPullError(model, str(exc) or type(exc).__name__) from exc
         finally:
             if owns:
                 client.close()
+
+        if stream_error is not None:
+            raise OllamaPullError(model, stream_error)
+        if not _model_installed(model, self.list_models()):
+            raise OllamaPullError(model, "model not present in /api/tags after pull")
 
     def serve(self, model: str, **kwargs: Any) -> ServerHandle:
         """Ollama auto-serves; verify reachability and return a handle."""
