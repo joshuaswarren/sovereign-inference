@@ -205,6 +205,7 @@ def test_install_calls_pull(monkeypatch: pytest.MonkeyPatch, capsys: pytest.Capt
 
     assert code == 0
     assert pulled["model"] == "qwen3:8b"
+    assert "Installed 'qwen3:8b' via ollama." in capsys.readouterr().out
 
 
 def test_install_pull_failure_returns_error(
@@ -219,6 +220,29 @@ def test_install_pull_failure_returns_error(
     code = cli.main(["install", "--runtime", "ollama", "--model", "qwen3:8b"])
 
     assert code == 1
+
+
+def test_install_reports_failed_ollama_pull(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # End to end through the real Ollama adapter: a 404 from /api/pull must not
+    # print "Installed" or exit 0.
+    import httpx
+    from sip_runtime_ollama import DEFAULT_BASE_URL, OllamaAdapter
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"error": "pull model manifest: file does not exist"})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), base_url=DEFAULT_BASE_URL)
+    monkeypatch.setattr(cli, "get_adapter", lambda name, *a, **k: OllamaAdapter(client=client))
+
+    code = cli.main(["install", "--runtime", "ollama", "--model", "definitely-not-a-real-model"])
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "Installed" not in captured.out
+    assert "install failed" in captured.err
+    assert "definitely-not-a-real-model" in captured.err
 
 
 # ---------------------------------------------------------------- benchmark

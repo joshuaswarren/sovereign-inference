@@ -13,7 +13,7 @@ from collections.abc import Callable
 
 import httpx
 import pytest
-from sip_runtime_ollama.adapter import DEFAULT_BASE_URL, OllamaAdapter, _pull_client
+from sip_runtime_ollama.adapter import DEFAULT_BASE_URL, OllamaAdapter, OllamaPullError, _pull_client
 
 
 def make_client(handler: Callable[[httpx.Request], httpx.Response]) -> httpx.Client:
@@ -124,32 +124,131 @@ def test_list_models_empty_on_missing_key() -> None:
     assert adapter.list_models() == []
 
 
-def test_pull_consumes_stream() -> None:
-    posted: dict[str, object] = {}
+def _ndjson(*objects: dict[str, object]) -> bytes:
+    return ("".join(json.dumps(o) + "\n" for o in objects)).encode()
+
+
+def _pull_handler(
+    pull: Callable[[httpx.Request], httpx.Response],
+    installed: list[str],
+) -> Callable[[httpx.Request], httpx.Response]:
+    """Route ``/api/pull`` to ``pull`` and answer ``/api/tags`` with ``installed``."""
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":
+            return httpx.Response(200, json={"models": [{"name": name} for name in installed]})
         assert request.url.path == "/api/pull"
-        posted["body"] = json.loads(request.content)
-        lines = [
-            json.dumps({"status": "pulling manifest"}),
-            json.dumps({"status": "downloading", "completed": 50, "total": 100}),
-            json.dumps({"status": "success"}),
-        ]
-        return httpx.Response(200, content=("\n".join(lines) + "\n").encode())
+        return pull(request)
 
-    adapter = OllamaAdapter(client=make_client(handler))
+    return handler
+
+
+def test_pull_succeeds_when_stream_ok_and_model_in_tags() -> None:
+    posted: dict[str, object] = {}
+
+    def pull(request: httpx.Request) -> httpx.Response:
+        posted["body"] = json.loads(request.content)
+        body = _ndjson(
+            {"status": "pulling manifest"},
+            {"status": "downloading", "completed": 50, "total": 100},
+            {"status": "success"},
+        )
+        return httpx.Response(200, content=body)
+
+    adapter = OllamaAdapter(client=make_client(_pull_handler(pull, ["llama3.2:latest"])))
     adapter.pull("llama3.2:latest")  # should complete without raising
 
     assert posted["body"] == {"name": "llama3.2:latest", "stream": True}
 
 
-def test_pull_degrades_on_error() -> None:
+def test_pull_matches_bare_name_against_latest_tag() -> None:
+    def pull(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=_ndjson({"status": "success"}))
+
+    adapter = OllamaAdapter(client=make_client(_pull_handler(pull, ["llama3.2:latest"])))
+    adapter.pull("llama3.2")  # Ollama stores a bare name under ":latest"
+
+
+def test_pull_raises_on_http_404() -> None:
+    def pull(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"error": "pull model manifest: file does not exist"})
+
+    adapter = OllamaAdapter(client=make_client(_pull_handler(pull, [])))
+    with pytest.raises(OllamaPullError) as exc:
+        adapter.pull("definitely-not-a-real-model")
+
+    assert exc.value.model == "definitely-not-a-real-model"
+    assert "404" in str(exc.value)
+    assert "file does not exist" in str(exc.value)
+
+
+def test_pull_raises_on_http_error_without_json_body() -> None:
+    def pull(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, content=b"internal error")
+
+    adapter = OllamaAdapter(client=make_client(_pull_handler(pull, [])))
+    with pytest.raises(OllamaPullError, match="HTTP 500"):
+        adapter.pull("llama3.2:latest")
+
+
+def test_pull_raises_on_http_error_with_json_body_lacking_error() -> None:
+    def pull(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(502, json={"detail": "bad gateway"})
+
+    adapter = OllamaAdapter(client=make_client(_pull_handler(pull, [])))
+    with pytest.raises(OllamaPullError) as exc:
+        adapter.pull("llama3.2:latest")
+
+    assert exc.value.reason == "HTTP 502 from /api/pull"
+
+
+def test_pull_raises_on_stream_error_object() -> None:
+    def pull(request: httpx.Request) -> httpx.Response:
+        body = _ndjson(
+            {"status": "pulling manifest"},
+            {"error": "pull model manifest: file does not exist"},
+        )
+        return httpx.Response(200, content=body)
+
+    # Even if the tags list somehow has the name, an in-band error wins.
+    adapter = OllamaAdapter(client=make_client(_pull_handler(pull, ["llama3.2:latest"])))
+    with pytest.raises(OllamaPullError, match="file does not exist"):
+        adapter.pull("llama3.2:latest")
+
+
+def test_pull_ignores_non_json_stream_lines() -> None:
+    def pull(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"not json\n\n" + _ndjson({"status": "success"}))
+
+    adapter = OllamaAdapter(client=make_client(_pull_handler(pull, ["llama3.2:latest"])))
+    adapter.pull("llama3.2:latest")
+
+
+def test_pull_raises_on_transport_error() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("offline", request=request)
 
     adapter = OllamaAdapter(client=make_client(handler))
-    # Pull must never crash the caller on a transport failure.
-    adapter.pull("llama3.2:latest")
+    with pytest.raises(OllamaPullError, match="offline") as exc:
+        adapter.pull("llama3.2:latest")
+
+    assert isinstance(exc.value.__cause__, httpx.ConnectError)
+
+
+def test_pull_raises_when_model_absent_from_tags() -> None:
+    def pull(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=_ndjson({"status": "success"}))
+
+    adapter = OllamaAdapter(client=make_client(_pull_handler(pull, [])))
+    with pytest.raises(OllamaPullError, match="not present in /api/tags"):
+        adapter.pull("llama3.2:latest")
+
+
+def test_pull_error_is_exported_from_package() -> None:
+    import sip_runtime_ollama
+
+    assert sip_runtime_ollama.OllamaPullError is OllamaPullError
+    assert issubclass(OllamaPullError, RuntimeError)
 
 
 def test_serve_returns_handle_when_reachable() -> None:
